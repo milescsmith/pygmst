@@ -9,6 +9,9 @@ from click_option_group import optgroup
 from typing import Optional
 import logging
 from subprocess import run
+import pyfaidx
+from Bio.SeqUtils import GC
+from sortedcontainers import SortedDict
 
 BINS = "1|2|3|0"
 SHAPE_TYPE = "linear|circular|partial"
@@ -39,7 +42,7 @@ fnn_out = ""
 faa_out = ""
 
 meta_out = "initial.meta.lst"
-# gc_out = meta_out.".feature" # what?
+gc_out = f"{meta_out}.feature"
 verbose = False
 
 
@@ -275,31 +278,139 @@ def main(
     elif strand == "reverse":
         hmm = f"{hmm} -s r "
 
+    list_of_temp = []
+    GC = 0
+
     #------------------------------------------------
     ## tmp solution: get sequence size, get minimum sequence size from --par <file>
     ## compare, skip iterations if short
 
     run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile} prepare sequence");
-    list_of_temp.extend(seq)
+    list_of_temp.extend((seq))
 
-    my $sequence_size = -s $seq;
+    sequence_size = len(seq)
 
-    $command = "grep MIN_SEQ_SIZE $par";
-    my $minimum_sequence_size = `$command`;
-    $minimum_sequence_size =~ s/\s*--MIN_SEQ_SIZE\s+//;
+    command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
+    minimum_sequence_size = re.findall(pattern="\s*--MIN_SEQ_SIZE\s+", string=str(command.stdout, "utf=8"))[0]
 
-    $do_iterations = 1;
+    do_iterations = 1
 
-    if ( $sequence_size < $minimum_sequence_size )
-    {
-            $do_iterations = 0;   
-    }
+    if sequence_size < minimum_sequence_size:
+        do_iterations = 0
+    
+    if do_iterations > 0:
+        #------------------------------------------------
+        # clustering
+
+        #initial prediction using MetaGeneMark model
+        #&RunSystem( "$hmm -m $meta_model -o $meta_out -d $seqfile -b" );
+        list_of_temp.extend((meta_out, f"{meta_out}.fna"))
+
+        #&RunSystem( "$build --stat_fasta $gc_out --seq $meta_out.fna " );
+        #&RunSystem( "$build --stat_fasta --seq $meta_out.fna > $gc_out " );#get GC of coding region for each sequence
+        gc_out = str(run(args=[build, "--stat_fasta", "--seq", seqfile], capture_output=True).stdout, "utf-8") #get GC of whole sequence for each sequence
+        list_of_temp.extend((gc_out))
+
+
+        #determine bin number and range
+        bin_num, cutoffs, seq_GC = cluster(gc_out, bins)
+        # Log("bin number = $bin_num\n");
+        # Log( "GC range = ".join(",",@$cutoffs)."\n" );
+
+        #------------------------------------------------
+        # training
+
+        # my $final_model;
+        # my @seqs;
+        # my @models; #n models
+        # my %handles; # file handles for n bins.
+        if bin_num == 1:
+            final_model = train(seqfile)
+            #-----------------------------
+            #make a GC file for the input file
+            #open NEWINPUT, ">", $newseq;
+            #-----------------------------
+            # read input sequences
+            try:
+                FA = pyfaidx.Fasta(seqfile)[:].seq
+                with open(seqfile, "r") as FA:
+                while (read_fasta_seq($FA, \%read)):
+                    if(!exists  $seq_GC->{$read{header}}): #no coding region in the sequence
+                        $seq_GC->{$read{header}} = getGC($read{seq})
+            except:
+                print(f"Cannot open {seqfile}")
+                #print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
+            #close NEWINPUT;
+            #$seqfile = $newseq; #use seq with GC for final prediction
+        
+        else{
+            #open NEWINPUT, ">", $newseq;
+            #-----------------------------
+            #create sequence file for each bin
+            #	
+            for(my $i = 1; $i <= $bin_num; ++$i){
+                my $fh;
+                open ($fh, ">seq_bin_$i");
+                push(@seqs, "seq_bin_$i");
+                #push @list_of_temp, "seq_bin_$i";
+                $handles{$i} = $fh;
+            }
+            #-----------------------------
+            # read input sequences
+            my $FA;
+            open($FA, $seqfile) or die "can't open $seqfile: $!\n";
+            my %read;
+            while (read_fasta_seq($FA, \%read)) {
+                if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
+                    $seq_GC->{$read{header}} = getGC($read{seq});
+                }
+                #--------------------------------------
+                #decide which bin the sequence belongs to 
+                #
+                my $bin;
+                if($bin_num == 2){
+                    if($seq_GC->{$read{header}} <= $cutoffs->[1]){
+                        $bin = 1;
+                    }
+                    else{
+                        $bin = 2;
+                    }
+                }
+                else{
+                    if( $seq_GC->{$read{header}} <= $cutoffs->[1] ){
+                        $bin = 1;
+                    }
+                    elsif( $seq_GC->{$read{header}} <= $cutoffs->[2]){
+                        $bin = 2;
+                    }
+                    else{
+                        $bin = 3;
+                    }
+                }
+                #output to corresponding output bin file
+                print {$handles{$bin}} ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
+            }
+            for(my $i = 1; $i <= $bin_num; ++$i){
+                close ( $handles{$i} );
+            }
+            #train 
+            for(my $i = 1; $i <= $bin_num; ++$i){
+                $models[$i-1] = train( $seqs[$i-1] );
+            }
+            #combine individual models to make the final model file
+            $final_model = combineModel( \@models, $cutoffs);
+            
+        }#more than one bin 
+
+        &RunSystem( "cp $final_model $out_name", "output: $out_name\n" );
+        push @list_of_temp, $final_model if $out_name ne $final_model;
+
     pass
 
 
 def cluster(feature_f, clusters):  # $gc_out, $bins
     gc_hash = dict()
-    cut_off_points = []
+    cut_off_points = list()
     num_of_seq = 0
     total_length = 0
     header_to_cod_GC = dict()
@@ -308,26 +419,27 @@ def cluster(feature_f, clusters):  # $gc_out, $bins
         # read in probuild output, line by line.  Should be fasta input.
         for line in GC:
             # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
-            text = re.match(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
+            text = re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
             if text:
                 header = text.group(1)  # Reference name
-                length = text.group(2)  # length of sequence?
-                GC = text.group(3)  # not sure, GC count?
-                header_re = re.match(
+                length = int(text.group(2))  # length of sequence?
+                GC = int(text.group(3))  # must be GC percentage
+                header_re = re.search(
                     pattern="^(.*?)\t", string=line
                 )  # Dont get this one - didn't we already extract just this capture group?
                 if header_re:
-                    header = re.match(1)
+                    header = header_re.group(1)
                 header_to_cod_GC[header] = GC
                 num_of_seq += 1
                 total_length += length
-                gc_hash[GC] += length
+                if GC in gc_hash:
+                    gc_hash[GC] += length
+                else:
+                    gc_hash[GC] = length
 
-    sorted_GC = {
-        _: gc_hash[_] for _ in sorted(gc_hash)
-    }  # sort the gc_hash dictionary by keys
-    min_GC = sorted_GC[0]
-    max_GC = sorted_GC[-1]
+    sorted_GC = SortedDict(gc_hash)  # sort the gc_hash dictionary by keys
+    min_GC = sorted_GC.values()[0]
+    max_GC = sorted_GC.values()[-1]
     print(f"min_GC={min_GC} max_GC={max_GC} total_seq_length={total_length}\n")
 
     previous = 0
@@ -377,10 +489,12 @@ def cluster(feature_f, clusters):  # $gc_out, $bins
 
     if clusters == 1:
         cut_off_points.extend((min_GC, max_GC))
-    return (clusters, cut_off_points, header_to_cod_GC)
+    return clusters, cut_off_points, header_to_cod_GC
 
 
 if __name__ == "__main__":
     if "--verbose" in sys.argv:
         verbose = True
     sys.exit(main())  # pragma: no cover
+
+# bin_num, cutoffs, seq_GC = cluster('initial.meta.lst.feature', 2)
