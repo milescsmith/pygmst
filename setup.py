@@ -39,17 +39,8 @@ setup(
     ],
     # extras_require=dict(doc=["sphinx", "sphinx_rtd_theme", "sphinx_autodoc_typehints"]),
     include_package_data=True,
-    entry_points={
-        "console_scripts": [
-            "gmst = gmst.gmst:main",
-        ]
-    },
+    entry_points={"console_scripts": ["gmst = gmst.gmst:main"]},
     packages=find_packages(),
     package_dir={"gmst": "gmst"},
-    package_data={
-        "": [
-            "gmst/models/*.*",
-            "gmst/utilities/*.*",
-        ]
-    },
+    package_data={"": ["gmst/models/*.*", "gmst/utilities/*.*"]},
 )

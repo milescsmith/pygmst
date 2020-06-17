@@ -1,0 +1,11 @@
+include *.md
+include *.txt
+recursive-include pygmst *.default
+recursive-include pygmst *.fa
+recursive-include pygmst *.mod
+recursive-include pygmst *.pl
+recursive-include pygmst *.py
+recursive-include pygmst *.tbl
+recursive-include pygmst utilities Gibbs3
+recursive-include pygmst utilities gmhmmp
+recursive-include pygmst utilities probuild

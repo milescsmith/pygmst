@@ -249,7 +249,7 @@ def main(
         width = 6
         fixmotif = 0
     if par is None:
-        par = 
+        par = f"par_{gcode}.default"
     if version:
         print(f"{__version__}")
     if verbose:
