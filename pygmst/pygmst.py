@@ -8,6 +8,7 @@ import logging
 from click_option_group import optgroup
 from typing import Optional
 import logging
+from subprocess import run
 
 BINS = "1|2|3|0"
 SHAPE_TYPE = "linear|circular|partial"
@@ -256,6 +257,43 @@ def main(
         # TODO: add actual logging
         # log = logging.basicConfig(filename='gmst.log', level=logging.INFO)
         pass
+    #------------------------------------------------
+    # more variables/settings
+
+    # use <probuild> with GeneMarkS parameter file <$par>
+    build = f"{build} --par {par}"
+
+    # set options for <gmhmmp>
+
+    # switch gene overlap off in GeneMark.hmm; for eukaryotic intron-less genomes
+    if offover:
+        hmm = f"{hmm} -p 0"
+
+    # set strand to predict
+    if strand == "direct":
+        hmm = f"{hmm} -s d "
+    elif strand == "reverse":
+        hmm = f"{hmm} -s r "
+
+    #------------------------------------------------
+    ## tmp solution: get sequence size, get minimum sequence size from --par <file>
+    ## compare, skip iterations if short
+
+    run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile} prepare sequence");
+    list_of_temp.extend(seq)
+
+    my $sequence_size = -s $seq;
+
+    $command = "grep MIN_SEQ_SIZE $par";
+    my $minimum_sequence_size = `$command`;
+    $minimum_sequence_size =~ s/\s*--MIN_SEQ_SIZE\s+//;
+
+    $do_iterations = 1;
+
+    if ( $sequence_size < $minimum_sequence_size )
+    {
+            $do_iterations = 0;   
+    }
     pass
 
 
