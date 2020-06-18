@@ -168,7 +168,7 @@ Output options:
 --faa       create file with protein sequence of predicted genes
 --clean     <number> delete all temporary files
             (default: $clean; supported: 1 <true> and 0 <false>)
-			
+            
 Run options:
 
 --bins      <number> number of clusters for inhomogeneous genome
@@ -223,8 +223,8 @@ if ( $#ARGV == -1 ) { print $usage; exit 0; }
 # parse command line
 if ( !GetOptions
   (
-  	'filter=i'    => \$filter,
-	'bins=i'      => \$bins,
+      'filter=i'    => \$filter,
+    'bins=i'      => \$bins,
     'output=s'    => \$output,
     'order=i'     => \$order,
     'order_non=i' => \$order_non,
@@ -246,8 +246,8 @@ if ( !GetOptions
     'ext=s'       => \$ext,
     'gibbs=i'     => \$gibbs_version,
     'version'     => \$version,
-	'clean=i'     => \$clean,
-	'prok'        => \$prok
+    'clean=i'     => \$clean,
+    'prok'        => \$prok
   )
 ) { exit 1; }
 
@@ -462,85 +462,85 @@ my @seqs;
 my @models; #n models
 my %handles; # file handles for n bins.
 if($bin_num == 1){
-	$final_model = train($seqfile);
+    $final_model = train($seqfile);
 
 =cut	
-	#-----------------------------
-	#make a GC file for the input file
-	#open NEWINPUT, ">", $newseq;
-	#-----------------------------
-	# read input sequences
-	my $FA;
-	open($FA, $seqfile) or die "can't open $seqfile: $!\n";
-	my %read;
-	while (read_fasta_seq($FA, \%read)) {
-	
-		if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
-			$seq_GC->{$read{header}} = getGC($read{seq});
-		}
-		#print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
-	}
-	#close NEWINPUT;
-	#$seqfile = $newseq; #use seq with GC for final prediction
+    #-----------------------------
+    #make a GC file for the input file
+    #open NEWINPUT, ">", $newseq;
+    #-----------------------------
+    # read input sequences
+    my $FA;
+    open($FA, $seqfile) or die "can't open $seqfile: $!\n";
+    my %read;
+    while (read_fasta_seq($FA, \%read)) {
+    
+        if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
+            $seq_GC->{$read{header}} = getGC($read{seq});
+        }
+        #print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
+    }
+    #close NEWINPUT;
+    #$seqfile = $newseq; #use seq with GC for final prediction
 =cut
 }
 else{
-	#open NEWINPUT, ">", $newseq;
-	#-----------------------------
-	#create sequence file for each bin
-	#	
-	for(my $i = 1; $i <= $bin_num; ++$i){
-		my $fh;
-		open ($fh, ">seq_bin_$i");
-		push(@seqs, "seq_bin_$i");
-		#push @list_of_temp, "seq_bin_$i";
-		$handles{$i} = $fh;
-	}
-	#-----------------------------
-	# read input sequences
-	my $FA;
-	open($FA, $seqfile) or die "can't open $seqfile: $!\n";
-	my %read;
-	while (read_fasta_seq($FA, \%read)) {
-		if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
-			$seq_GC->{$read{header}} = getGC($read{seq});
-		}
-		#--------------------------------------
-		#decide which bin the sequence belongs to 
-		#
-		my $bin;
-		if($bin_num == 2){
-			if($seq_GC->{$read{header}} <= $cutoffs->[1]){
-				$bin = 1;
-			}
-			else{
-				$bin = 2;
-			}
-		}
-		else{
-			if( $seq_GC->{$read{header}} <= $cutoffs->[1] ){
-				$bin = 1;
-			}
-			elsif( $seq_GC->{$read{header}} <= $cutoffs->[2]){
-				$bin = 2;
-			}
-			else{
-				$bin = 3;
-			}
-		}
-		#output to corresponding output bin file
-		print {$handles{$bin}} ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
-	}
-	for(my $i = 1; $i <= $bin_num; ++$i){
-		close ( $handles{$i} );
-	}
-	#train 
-	for(my $i = 1; $i <= $bin_num; ++$i){
-		$models[$i-1] = train( $seqs[$i-1] );
-	}
-	#combine individual models to make the final model file
-	$final_model = combineModel( \@models, $cutoffs);
-	
+    #open NEWINPUT, ">", $newseq;
+    #-----------------------------
+    #create sequence file for each bin
+    #	
+    for(my $i = 1; $i <= $bin_num; ++$i){
+        my $fh;
+        open ($fh, ">seq_bin_$i");
+        push(@seqs, "seq_bin_$i");
+        #push @list_of_temp, "seq_bin_$i";
+        $handles{$i} = $fh;
+    }
+    #-----------------------------
+    # read input sequences
+    my $FA;
+    open($FA, $seqfile) or die "can't open $seqfile: $!\n";
+    my %read;
+    while (read_fasta_seq($FA, \%read)) {
+        if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
+            $seq_GC->{$read{header}} = getGC($read{seq});
+        }
+        #--------------------------------------
+        #decide which bin the sequence belongs to 
+        #
+        my $bin;
+        if($bin_num == 2){
+            if($seq_GC->{$read{header}} <= $cutoffs->[1]){
+                $bin = 1;
+            }
+            else{
+                $bin = 2;
+            }
+        }
+        else{
+            if( $seq_GC->{$read{header}} <= $cutoffs->[1] ){
+                $bin = 1;
+            }
+            elsif( $seq_GC->{$read{header}} <= $cutoffs->[2]){
+                $bin = 2;
+            }
+            else{
+                $bin = 3;
+            }
+        }
+        #output to corresponding output bin file
+        print {$handles{$bin}} ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
+    }
+    for(my $i = 1; $i <= $bin_num; ++$i){
+        close ( $handles{$i} );
+    }
+    #train 
+    for(my $i = 1; $i <= $bin_num; ++$i){
+        $models[$i-1] = train( $seqs[$i-1] );
+    }
+    #combine individual models to make the final model file
+    $final_model = combineModel( \@models, $cutoffs);
+    
 }#more than one bin 
 
 &RunSystem( "cp $final_model $out_name", "output: $out_name\n" );
@@ -607,119 +607,119 @@ $time = localtime();
 # gms training
 # -----------------------------------------------
 sub train{
-	my $input_seq = shift;
-	#------------------------------------------------
-	# prepare sequence
-	&RunSystem( "$build --clean_join $seq --seq $input_seq --log $logfile", "prepare sequence\n" );
-	push @list_of_temp, $seq;
+    my $input_seq = shift;
+    #------------------------------------------------
+    # prepare sequence
+    &RunSystem( "$build --clean_join $seq --seq $input_seq --log $logfile", "prepare sequence\n" );
+    push @list_of_temp, $seq;
 
-	#------------------------------------------------
-	# tmp solution: get sequence size, get minimum sequence size from --par <file>
-	# compare, skip iterations if short
+    #------------------------------------------------
+    # tmp solution: get sequence size, get minimum sequence size from --par <file>
+    # compare, skip iterations if short
 
-	my $sequence_size = -s $seq;
-	$command = "grep MIN_SEQ_SIZE $par";
-	my $minimum_sequence_size = `$command`;
-	$minimum_sequence_size =~ s/\s*--MIN_SEQ_SIZE\s+//;
+    my $sequence_size = -s $seq;
+    $command = "grep MIN_SEQ_SIZE $par";
+    my $minimum_sequence_size = `$command`;
+    $minimum_sequence_size =~ s/\s*--MIN_SEQ_SIZE\s+//;
 
-	$do_iterations = 1;
+    $do_iterations = 1;
 
-	if ( $sequence_size < $minimum_sequence_size )
-	{
-	&RunSystem( "$build --clean_join $seq --seq $input_seq --log $logfile --MIN_CONTIG_SIZE 0 --GAP_FILLER ", "prepare sequence\n" );
-	$do_iterations = 0;
-	}
+    if ( $sequence_size < $minimum_sequence_size )
+    {
+    &RunSystem( "$build --clean_join $seq --seq $input_seq --log $logfile --MIN_CONTIG_SIZE 0 --GAP_FILLER ", "prepare sequence\n" );
+    $do_iterations = 0;
+    }
 
-	&Log( "do_iterations = $do_iterations\n" );
+    &Log( "do_iterations = $do_iterations\n" );
 
-	#------------------------------------------------
-	# run initial prediction
-	$itr = 0;
-	$next = &GetNameForNext( $itr );
-	&RunSystem( "$hmm  $seq  -m $meta_model  -o $next", "run initial prediction\n" );
-	push @list_of_temp, $next;
+    #------------------------------------------------
+    # run initial prediction
+    $itr = 0;
+    $next = &GetNameForNext( $itr );
+    &RunSystem( "$hmm  $seq  -m $meta_model  -o $next", "run initial prediction\n" );
+    push @list_of_temp, $next;
 
-	#------------------------------------------------
-	# enter iterations loop
+    #------------------------------------------------
+    # enter iterations loop
 
-	&Log( "entering iteration loop\n" );
+    &Log( "entering iteration loop\n" );
 
-	while( $do_iterations )
-	{
-	$itr++;
-	$mod  = GetNameForMod( $itr );
+    while( $do_iterations )
+    {
+    $itr++;
+    $mod  = GetNameForMod( $itr );
 
-	if ( $motif && !($fixmotif) )
-	{
-		$start_seq = $start_prefix . $itr;
-		$gibbs_out = $gibbs_prefix . $itr;
-	}
+    if ( $motif && !($fixmotif) )
+    {
+        $start_seq = $start_prefix . $itr;
+        $gibbs_out = $gibbs_prefix . $itr;
+    }
 
-	$command = "$build --mkmod $mod --seq $seq --geneset $next --ORDM $order --order_non $order_non --revcomp_non 1";
+    $command = "$build --mkmod $mod --seq $seq --geneset $next --ORDM $order --order_non $order_non --revcomp_non 1";
 
-	if ( $motif && !$fixmotif )
-	{ $command .= " --pre_start $start_seq --PRE_START_WIDTH $prestart"; }
-	elsif ( $motif && $fixmotif )
-	{ $command .= " --fixmotif --PRE_START_WIDTH $prestart --width $width --log $logfile"; }
+    if ( $motif && !$fixmotif )
+    { $command .= " --pre_start $start_seq --PRE_START_WIDTH $prestart"; }
+    elsif ( $motif && $fixmotif )
+    { $command .= " --fixmotif --PRE_START_WIDTH $prestart --width $width --log $logfile"; }
 
-	&RunSystem( $command, "build model: $mod for iteration: $itr\n" );
-	push @list_of_temp, $mod;
+    &RunSystem( $command, "build model: $mod for iteration: $itr\n" );
+    push @list_of_temp, $mod;
 
-	if ( $motif && !$fixmotif )
-	{
-		if ( $gibbs_version == 1 )
-		{
-			&RunSystem( "$gibbs $start_seq $width -n > $gibbs_out", "run gibbs sampler\n" );
-		}
-		elsif ( $gibbs_version == 3 )
-		{
-			#&RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -S 20  -y -x -m  -i 2000 -w 0.01", "run gibbs3 sampler\n" );
-			&RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" );
-		}
+    if ( $motif && !$fixmotif )
+    {
+        if ( $gibbs_version == 1 )
+        {
+            &RunSystem( "$gibbs $start_seq $width -n > $gibbs_out", "run gibbs sampler\n" );
+        }
+        elsif ( $gibbs_version == 3 )
+        {
+            #&RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -S 20  -y -x -m  -i 2000 -w 0.01", "run gibbs3 sampler\n" );
+            &RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" );
+        }
     
-		push @list_of_temp, $start_seq;
+        push @list_of_temp, $start_seq;
 
-		&RunSystem( "$build --gibbs $gibbs_out --mod $mod --seq $start_seq --log $logfile", "make prestart model\n" );
-		push @list_of_temp, $gibbs_out;
-	}
+        &RunSystem( "$build --gibbs $gibbs_out --mod $mod --seq $start_seq --log $logfile", "make prestart model\n" );
+        push @list_of_temp, $gibbs_out;
+    }
 
-	$prev = $next;
-	$next = &GetNameForNext( $itr );
+    $prev = $next;
+    $next = &GetNameForNext( $itr );
 
-	$command = "$hmm  $seq  -m $mod  -o $next";
-	if ( $motif )
-		{ $command .= " -r"; }
+    $command = "$hmm  $seq  -m $mod  -o $next";
+    if ( $motif )
+        { $command .= " -r"; }
 
-	&RunSystem( $command, "prediction, iteration: $itr\n" );
-	push @list_of_temp, $next;
+    &RunSystem( $command, "prediction, iteration: $itr\n" );
+    push @list_of_temp, $next;
 
-	$command = "$build --compare --source $next --target $prev";
-	&Log( "compare:\n" . $command . "\n" );
+    $command = "$build --compare --source $next --target $prev";
+    &Log( "compare:\n" . $command . "\n" );
 
-	$diff = `$command`;
-	chomp( $diff );
-	&Log( "compare $prev and $next: $diff\n" );
+    $diff = `$command`;
+    chomp( $diff );
+    &Log( "compare $prev and $next: $diff\n" );
 
-	if ( $diff >= $identity )
-		{ &Log( "Stopped iterations on identity: $diff\n" ); last; }
-	if ( $itr == $maxitr )
-		{ &Log( "Stopped iterations on maximum number: $maxitr\n" ); last; }
-	}
-	#------------------------------------------------
-	# create ouput
-	
-	
-	if ( $do_iterations )
-	{
-		&RunSystem( "cp $mod $input_seq.mod", "create: $input_seq.mod\n" );
-		return $input_seq.".mod";
-		
-	}
-	else
-	{ 
-	#	&RunSystem( "cp $imod $input_seq.mod", "create: $input_seq.mod\n" );
-	#	return $meta_model;
-	}
+    if ( $diff >= $identity )
+        { &Log( "Stopped iterations on identity: $diff\n" ); last; }
+    if ( $itr == $maxitr )
+        { &Log( "Stopped iterations on maximum number: $maxitr\n" ); last; }
+    }
+    #------------------------------------------------
+    # create ouput
+    
+    
+    if ( $do_iterations )
+    {
+        &RunSystem( "cp $mod $input_seq.mod", "create: $input_seq.mod\n" );
+        return $input_seq.".mod";
+        
+    }
+    else
+    { 
+    #	&RunSystem( "cp $imod $input_seq.mod", "create: $input_seq.mod\n" );
+    #	return $meta_model;
+    }
 
 }
 
@@ -727,95 +727,95 @@ sub train{
 # cluster sequences according to GC of coding regions
 # -----------------------------------------------
 sub cluster{
-	my $feature_f = shift; #feature file from probuild
-	my $clusters = shift; #user-defiend number of bins. Default=0
-	#my $out = "/home/gena/_temp_out";
-	#`~alexl/DISTR/src/probuild/probuild --stat_fasta  $out   --seq $seq_file`;
-	
-	my %gc_hash;
-	my @cut_off_points;
-	my ($min_GC, $max_GC, $one_third, $two_third, $one_half);
-	my $num_of_seq = 0;
-	my $total_length = 0;
-	my %header_to_cod_GC;
+    my $feature_f = shift; #feature file from probuild
+    my $clusters = shift; #user-defiend number of bins. Default=0
+    #my $out = "/home/gena/_temp_out";
+    #`~alexl/DISTR/src/probuild/probuild --stat_fasta  $out   --seq $seq_file`;
+    
+    my %gc_hash;
+    my @cut_off_points;
+    my ($min_GC, $max_GC, $one_third, $two_third, $one_half);
+    my $num_of_seq = 0;
+    my $total_length = 0;
+    my %header_to_cod_GC;
 
-	open (GC, "<", $feature_f) or die "can't open $feature_f: $!\n";
-	while (<GC>){
-		next if ($_ !~ /^>(.*?)\t(\d+)\s+(\d+)/);
-		my $header = $1;
-		my $length = $2;
-		my $GC = $3;
-		if($header =~ /^(.*?)\t/){
-			$header = $1;
-		}
-		$header_to_cod_GC{$header} = $GC;
-		$num_of_seq ++;
-		$total_length += $length;
-		$gc_hash{$GC} += $length;
-		#$gc_hash{$GC} ++;
-	
-	}
-	close GC;
-	
-	my @sorted_GC = sort {$a<=>$b} keys %gc_hash;
-	$min_GC = $sorted_GC[0];
-	$max_GC = $sorted_GC[-1];
-	&Log ( "min_GC=$min_GC  max_GC=$max_GC total_seq_length=$total_length\n" );
+    open (GC, "<", $feature_f) or die "can't open $feature_f: $!\n";
+    while (<GC>){
+        next if ($_ !~ /^>(.*?)\t(\d+)\s+(\d+)/);
+        my $header = $1;
+        my $length = $2;
+        my $GC = $3;
+        if($header =~ /^(.*?)\t/){
+            $header = $1;
+        }
+        $header_to_cod_GC{$header} = $GC;
+        $num_of_seq ++;
+        $total_length += $length;
+        $gc_hash{$GC} += $length;
+        #$gc_hash{$GC} ++;
+    
+    }
+    close GC;
+    
+    my @sorted_GC = sort {$a<=>$b} keys %gc_hash;
+    $min_GC = $sorted_GC[0];
+    $max_GC = $sorted_GC[-1];
+    &Log ( "min_GC=$min_GC  max_GC=$max_GC total_seq_length=$total_length\n" );
 
-	my $previous = 0;
-	for my $key (@sorted_GC){
-		$gc_hash{$key} += $previous;
-	#	if($previous < $num_of_seq/3 && $gc_hash{$key} >= $num_of_seq/3){$one_third = $key};
-	#	if($previous < $num_of_seq/3*2 && $gc_hash{$key} >= $num_of_seq/3*2){$two_third = $key};
-	#	if($previous < $num_of_seq/2 && $gc_hash{$key} >= $num_of_seq/2){$one_half = $key};
+    my $previous = 0;
+    for my $key (@sorted_GC){
+        $gc_hash{$key} += $previous;
+    #	if($previous < $num_of_seq/3 && $gc_hash{$key} >= $num_of_seq/3){$one_third = $key};
+    #	if($previous < $num_of_seq/3*2 && $gc_hash{$key} >= $num_of_seq/3*2){$two_third = $key};
+    #	if($previous < $num_of_seq/2 && $gc_hash{$key} >= $num_of_seq/2){$one_half = $key};
 
-		if($previous < $total_length/3 && $gc_hash{$key} >= $total_length/3){$one_third = $key};
-		if($previous < $total_length/3*2 && $gc_hash{$key} >= $total_length/3*2){$two_third = $key};
-		if($previous < $total_length/2 && $gc_hash{$key} >= $total_length/2){$one_half = $key};
-		$previous = $gc_hash{$key};
-	}
-		&Log ("($one_third)->($gc_hash{$one_third})\n");
-		&Log ("($one_half)->($gc_hash{$one_half})\n");
-		&Log ("($two_third)->($gc_hash{$two_third})\n");
+        if($previous < $total_length/3 && $gc_hash{$key} >= $total_length/3){$one_third = $key};
+        if($previous < $total_length/3*2 && $gc_hash{$key} >= $total_length/3*2){$two_third = $key};
+        if($previous < $total_length/2 && $gc_hash{$key} >= $total_length/2){$one_half = $key};
+        $previous = $gc_hash{$key};
+    }
+        &Log ("($one_third)->($gc_hash{$one_third})\n");
+        &Log ("($one_half)->($gc_hash{$one_half})\n");
+        &Log ("($two_third)->($gc_hash{$two_third})\n");
 
-	if($clusters == 0){
-		#cluster number is not specified by user
-		#automatically choose cluster number.
-		if( $two_third - $one_third > 3){
-			$clusters = 3;
-		}
-		else {
-			$clusters = 1;
-		}
-	}
-	if($clusters == 3){
-		if($two_third - $one_third < 1 || $max_GC - $two_third < 1 || $one_third - $min_GC < 1){
-			&Log( "Total number of sequences is not enough for training in 3 clusters!\n" );
-			$clusters = 1;
-		}
-		else{
-			if($gc_hash{$one_third} > $MIN_LENGTH){
-				push @cut_off_points, ($min_GC,$one_third,$two_third,$max_GC);}
-			else{
-				&Log( "Total length of sequences is not enough for training in 3 clusters!\n" );
-				$clusters = 2;
-			}
-		}
-	}
-	if($clusters == 2){
-		if($gc_hash{$one_half} > $MIN_LENGTH){
-			push @cut_off_points, ($min_GC,$one_half,$max_GC);}
-		else{
-			&Log( "Total length of sequences is not enough for training in 2 clusters!\n" );
-			$clusters = 1;
-		}
-	}
+    if($clusters == 0){
+        #cluster number is not specified by user
+        #automatically choose cluster number.
+        if( $two_third - $one_third > 3){
+            $clusters = 3;
+        }
+        else {
+            $clusters = 1;
+        }
+    }
+    if($clusters == 3){
+        if($two_third - $one_third < 1 || $max_GC - $two_third < 1 || $one_third - $min_GC < 1){
+            &Log( "Total number of sequences is not enough for training in 3 clusters!\n" );
+            $clusters = 1;
+        }
+        else{
+            if($gc_hash{$one_third} > $MIN_LENGTH){
+                push @cut_off_points, ($min_GC,$one_third,$two_third,$max_GC);}
+            else{
+                &Log( "Total length of sequences is not enough for training in 3 clusters!\n" );
+                $clusters = 2;
+            }
+        }
+    }
+    if($clusters == 2){
+        if($gc_hash{$one_half} > $MIN_LENGTH){
+            push @cut_off_points, ($min_GC,$one_half,$max_GC);}
+        else{
+            &Log( "Total length of sequences is not enough for training in 2 clusters!\n" );
+            $clusters = 1;
+        }
+    }
 
-	if($clusters == 1){
-		push @cut_off_points, ($min_GC, $max_GC);
-	}
-	#print $clusters," ",join(" ", @cut_off_points);
-	return ($clusters,\@cut_off_points,\%header_to_cod_GC);
+    if($clusters == 1){
+        push @cut_off_points, ($min_GC, $max_GC);
+    }
+    #print $clusters," ",join(" ", @cut_off_points);
+    return ($clusters,\@cut_off_points,\%header_to_cod_GC);
 }
 
 #--------------------------------------------------------------------
@@ -869,39 +869,39 @@ sub read_fasta_seq {
 # -----------------------------------------------
 
 sub combineModel{
-	my $mod = $_[0];
-	my @cut_offs = @{$_[1]};
+    my $mod = $_[0];
+    my @cut_offs = @{$_[1]};
 #	my ($mod, $cut_offs) = @_;
-	
-	#change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
-	$cut_offs[0] = $minGC;
-	$cut_offs[scalar @cut_offs - 1] = $maxGC;
-	
-	my $b = 1;
-	open MODEL, ">final_model";
-	for(my $i = $minGC; $i <=$maxGC; $i ++){
-		print MODEL "__GC".$i."\t\n";
-		if($i == $cut_offs[$b] || $i == $maxGC){
-			open my $fh, '<', $mod->[$b-1] or die;
-			#my $data = do { local $/; <$fh> };
-			#close $fh;
-			my $data;
-			while(my $line = <$fh>){
-				if($line =~ /NAME/){
-					chomp $line;
-					$line .= "_GC<=$i\n";
-				}
-				$data .= $line;
-			}
-			close $fh;
-			print MODEL $data;
-			print MODEL "end \t\n\n";
-			last if( $b > scalar(@$mod));
-			$b ++;
-		}
-	}
-	close MODEL;
-	return "final_model";
+    
+    #change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
+    $cut_offs[0] = $minGC;
+    $cut_offs[scalar @cut_offs - 1] = $maxGC;
+    
+    my $b = 1;
+    open MODEL, ">final_model";
+    for(my $i = $minGC; $i <=$maxGC; $i ++){
+        print MODEL "__GC".$i."\t\n";
+        if($i == $cut_offs[$b] || $i == $maxGC){
+            open my $fh, '<', $mod->[$b-1] or die;
+            #my $data = do { local $/; <$fh> };
+            #close $fh;
+            my $data;
+            while(my $line = <$fh>){
+                if($line =~ /NAME/){
+                    chomp $line;
+                    $line .= "_GC<=$i\n";
+                }
+                $data .= $line;
+            }
+            close $fh;
+            print MODEL $data;
+            print MODEL "end \t\n\n";
+            last if( $b > scalar(@$mod));
+            $b ++;
+        }
+    }
+    close MODEL;
+    return "final_model";
 }
 
 #-----------------------------------------------
@@ -991,7 +991,7 @@ sub GetHeuristicFileName
 
   if ( defined $ord )
   {
-  	return $dir ."/heu_" . $code . "_" . $GC . "_" . $ord . $ext;
+      return $dir ."/heu_" . $code . "_" . $GC . "_" . $ord . $ext;
   }
   else
   {
@@ -1089,7 +1089,7 @@ sub getGC {
                 return ($gc/$length*100);
         }
         else {
-			return -1;
+            return -1;
                 #return "It's an empty sequence";
         }
 }

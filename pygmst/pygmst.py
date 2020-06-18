@@ -206,11 +206,12 @@ verbose = False
 )
 @optgroup.option("--verbose", is_flag=True, default=False, show_default=True)
 @optgroup.option("--version", is_flag=True, default=False, show_default=True)
-@click.argument("input", type=click.File("rb"))
+@click.argument("seqfile", type=click.File("rb"))
 @click.help_option(show_default=True)
 @Log(verbose)
 def main(
-    sequence_file_name: str,
+    seqfile: str,
+    output: str,
     outputformat: Optional[str] = None,
     format: str = "LST",
     fnn: bool = False,
@@ -332,81 +333,81 @@ def main(
             #-----------------------------
             # read input sequences
             try:
-                FA = pyfaidx.Fasta(seqfile)[:].seq
-                with open(seqfile, "r") as FA:
-                while (read_fasta_seq($FA, \%read)):
-                    if(!exists  $seq_GC->{$read{header}}): #no coding region in the sequence
-                        $seq_GC->{$read{header}} = getGC($read{seq})
+                FA = pyfaidx.Fasta(seqfile)
+                seq_GC_entries = [_.lstrip('>') for _ in seq_GC.keys()]
+                for read in FA:
+                    if read.long_name not in seq_GC_entries:
+                        seq_GC[f">{read.long_name}"] = int(GC(read[:].seq))
             except:
                 print(f"Cannot open {seqfile}")
                 #print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
-            #close NEWINPUT;
-            #$seqfile = $newseq; #use seq with GC for final prediction
         
-        else{
-            #open NEWINPUT, ">", $newseq;
-            #-----------------------------
-            #create sequence file for each bin
-            #	
-            for(my $i = 1; $i <= $bin_num; ++$i){
-                my $fh;
-                open ($fh, ">seq_bin_$i");
-                push(@seqs, "seq_bin_$i");
-                #push @list_of_temp, "seq_bin_$i";
-                $handles{$i} = $fh;
-            }
-            #-----------------------------
-            # read input sequences
-            my $FA;
-            open($FA, $seqfile) or die "can't open $seqfile: $!\n";
-            my %read;
-            while (read_fasta_seq($FA, \%read)) {
-                if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
-                    $seq_GC->{$read{header}} = getGC($read{seq});
-                }
-                #--------------------------------------
-                #decide which bin the sequence belongs to 
-                #
-                my $bin;
-                if($bin_num == 2){
-                    if($seq_GC->{$read{header}} <= $cutoffs->[1]){
-                        $bin = 1;
-                    }
-                    else{
-                        $bin = 2;
-                    }
-                }
-                else{
-                    if( $seq_GC->{$read{header}} <= $cutoffs->[1] ){
-                        $bin = 1;
-                    }
-                    elsif( $seq_GC->{$read{header}} <= $cutoffs->[2]){
-                        $bin = 2;
-                    }
-                    else{
-                        $bin = 3;
-                    }
-                }
-                #output to corresponding output bin file
-                print {$handles{$bin}} ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
-            }
-            for(my $i = 1; $i <= $bin_num; ++$i){
-                close ( $handles{$i} );
-            }
-            #train 
-            for(my $i = 1; $i <= $bin_num; ++$i){
-                $models[$i-1] = train( $seqs[$i-1] );
-            }
-            #combine individual models to make the final model file
-            $final_model = combineModel( \@models, $cutoffs);
+        # else{
+        #     #open NEWINPUT, ">", $newseq;
+        #     #-----------------------------
+        #     #create sequence file for each bin
+        #     #	
+        #     for(my $i = 1; $i <= $bin_num; ++$i){
+        #         my $fh;
+        #         open ($fh, ">seq_bin_$i");
+        #         push(@seqs, "seq_bin_$i");
+        #         #push @list_of_temp, "seq_bin_$i";
+        #         $handles{$i} = $fh;
+        #     }
+        #     #-----------------------------
+        #     # read input sequences
+        #     my $FA;
+        #     open($FA, $seqfile) or die "can't open $seqfile: $!\n";
+        #     my %read;
+        #     while (read_fasta_seq($FA, \%read)) {
+        #         if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
+        #             $seq_GC->{$read{header}} = getGC($read{seq});
+        #         }
+        #         #--------------------------------------
+        #         #decide which bin the sequence belongs to 
+        #         #
+        #         my $bin;
+        #         if($bin_num == 2){
+        #             if($seq_GC->{$read{header}} <= $cutoffs->[1]){
+        #                 $bin = 1;
+        #             }
+        #             else{
+        #                 $bin = 2;
+        #             }
+        #         }
+        #         else{
+        #             if( $seq_GC->{$read{header}} <= $cutoffs->[1] ){
+        #                 $bin = 1;
+        #             }
+        #             elsif( $seq_GC->{$read{header}} <= $cutoffs->[2]){
+        #                 $bin = 2;
+        #             }
+        #             else{
+        #                 $bin = 3;
+        #             }
+        #         }
+        #         #output to corresponding output bin file
+        #         print {$handles{$bin}} ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
+        #     }
+        #     for(my $i = 1; $i <= $bin_num; ++$i){
+        #         close ( $handles{$i} );
+        #     }
+        #     #train 
+        #     for(my $i = 1; $i <= $bin_num; ++$i){
+        #         $models[$i-1] = train( $seqs[$i-1] );
+        #     }
+        #     #combine individual models to make the final model file
+        #     $final_model = combineModel( \@models, $cutoffs);
             
-        }#more than one bin 
+        # }#more than one bin 
 
-        &RunSystem( "cp $final_model $out_name", "output: $out_name\n" );
-        push @list_of_temp, $final_model if $out_name ne $final_model;
+        # &RunSystem( "cp $final_model $out_name", "output: $out_name\n" );
+        # push @list_of_temp, $final_model if $out_name ne $final_model;
 
     pass
 
+def train():
+    pass
 
 def cluster(feature_f, clusters):  # $gc_out, $bins
     gc_hash = dict()
