@@ -1,3 +1,12 @@
+.. image:: https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg
+    :alt: License: MPL2.0
+    :target: https://opensource.org/licenses/MPL-2.0
+
+.. image:: https://img.shields.io/badge/code%20style-black-000000.svg
+    :alt: Code style: black
+    :target: https://github.com/python/black
+
+
 pygmst
 ======
 
