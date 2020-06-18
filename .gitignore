@@ -140,3 +140,10 @@ dmypy.json
 
 .vscode/
 pygmst/test.pl
+pygmst/seq_bin*
+pygmst/probuild
+pygmst/gmst_*
+pygmst/MetaGeneMark_v1.mod
+pygmst/par_*
+pygmst/gmhmmp
+pygmst/GeneMark_hmm.mod

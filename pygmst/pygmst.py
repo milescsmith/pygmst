@@ -12,6 +12,7 @@ from subprocess import run
 import pyfaidx
 from Bio.SeqUtils import GC
 from sortedcontainers import SortedDict
+from tempfile import TemporaryDirectory
 
 BINS = "1|2|3|0"
 SHAPE_TYPE = "linear|circular|partial"
@@ -213,7 +214,6 @@ def main(
     seqfile: str,
     output: str,
     outputformat: Optional[str] = None,
-    format: str = "LST",
     fnn: bool = False,
     faa: bool = False,
     clean: bool = True,
@@ -261,7 +261,7 @@ def main(
         # TODO: add actual logging
         # log = logging.basicConfig(filename='gmst.log', level=logging.INFO)
         pass
-    #------------------------------------------------
+    # ------------------------------------------------
     # more variables/settings
 
     # use <probuild> with GeneMarkS parameter file <$par>
@@ -282,132 +282,159 @@ def main(
     list_of_temp = []
     GC = 0
 
-    #------------------------------------------------
+    # ------------------------------------------------
     ## tmp solution: get sequence size, get minimum sequence size from --par <file>
     ## compare, skip iterations if short
 
-    run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile} prepare sequence");
+    run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile} prepare sequence")
     list_of_temp.extend((seq))
 
     sequence_size = len(seq)
 
     command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
-    minimum_sequence_size = re.findall(pattern="\s*--MIN_SEQ_SIZE\s+", string=str(command.stdout, "utf=8"))[0]
+    minimum_sequence_size = re.findall(
+        pattern="\s*--MIN_SEQ_SIZE\s+", string=str(command.stdout, "utf=8")
+    )[0]
 
     do_iterations = 1
 
     if sequence_size < minimum_sequence_size:
         do_iterations = 0
-    
+
     if do_iterations > 0:
-        #------------------------------------------------
+        # ------------------------------------------------
         # clustering
 
-        #initial prediction using MetaGeneMark model
-        #&RunSystem( "$hmm -m $meta_model -o $meta_out -d $seqfile -b" );
+        # initial prediction using MetaGeneMark model
+        # &RunSystem( "$hmm -m $meta_model -o $meta_out -d $seqfile -b" );
         list_of_temp.extend((meta_out, f"{meta_out}.fna"))
 
-        #&RunSystem( "$build --stat_fasta $gc_out --seq $meta_out.fna " );
-        #&RunSystem( "$build --stat_fasta --seq $meta_out.fna > $gc_out " );#get GC of coding region for each sequence
-        gc_out = str(run(args=[build, "--stat_fasta", "--seq", seqfile], capture_output=True).stdout, "utf-8") #get GC of whole sequence for each sequence
+        # &RunSystem( "$build --stat_fasta $gc_out --seq $meta_out.fna " );
+        # &RunSystem( "$build --stat_fasta --seq $meta_out.fna > $gc_out " );#get GC of coding region for each sequence
+        gc_out = str(
+            run(
+                args=[build, "--stat_fasta", "--seq", seqfile], capture_output=True
+            ).stdout,
+            "utf-8",
+        )  # get GC of whole sequence for each sequence
         list_of_temp.extend((gc_out))
 
-
-        #determine bin number and range
+        # determine bin number and range
         bin_num, cutoffs, seq_GC = cluster(gc_out, bins)
         # Log("bin number = $bin_num\n");
         # Log( "GC range = ".join(",",@$cutoffs)."\n" );
 
-        #------------------------------------------------
+        # ------------------------------------------------
         # training
 
         # my $final_model;
         # my @seqs;
-        # my @models; #n models
+        models = dict()
+        seqs = []
         # my %handles; # file handles for n bins.
         if bin_num == 1:
             final_model = train(seqfile)
-            #-----------------------------
-            #make a GC file for the input file
-            #open NEWINPUT, ">", $newseq;
-            #-----------------------------
+            # -----------------------------
+            # make a GC file for the input file
+            # open NEWINPUT, ">", $newseq;
+            # -----------------------------
             # read input sequences
             try:
                 FA = pyfaidx.Fasta(seqfile)
-                seq_GC_entries = [_.lstrip('>') for _ in seq_GC.keys()]
+                seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
                 for read in FA:
                     if read.long_name not in seq_GC_entries:
                         seq_GC[f">{read.long_name}"] = int(GC(read[:].seq))
             except:
                 print(f"Cannot open {seqfile}")
-                #print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
-        
-        # else{
-        #     #open NEWINPUT, ">", $newseq;
-        #     #-----------------------------
-        #     #create sequence file for each bin
-        #     #	
-        #     for(my $i = 1; $i <= $bin_num; ++$i){
-        #         my $fh;
-        #         open ($fh, ">seq_bin_$i");
-        #         push(@seqs, "seq_bin_$i");
-        #         #push @list_of_temp, "seq_bin_$i";
-        #         $handles{$i} = $fh;
-        #     }
-        #     #-----------------------------
-        #     # read input sequences
-        #     my $FA;
-        #     open($FA, $seqfile) or die "can't open $seqfile: $!\n";
-        #     my %read;
-        #     while (read_fasta_seq($FA, \%read)) {
-        #         if(!exists  $seq_GC->{$read{header}}){ #no coding region in the sequence
-        #             $seq_GC->{$read{header}} = getGC($read{seq});
-        #         }
-        #         #--------------------------------------
-        #         #decide which bin the sequence belongs to 
-        #         #
-        #         my $bin;
-        #         if($bin_num == 2){
-        #             if($seq_GC->{$read{header}} <= $cutoffs->[1]){
-        #                 $bin = 1;
-        #             }
-        #             else{
-        #                 $bin = 2;
-        #             }
-        #         }
-        #         else{
-        #             if( $seq_GC->{$read{header}} <= $cutoffs->[1] ){
-        #                 $bin = 1;
-        #             }
-        #             elsif( $seq_GC->{$read{header}} <= $cutoffs->[2]){
-        #                 $bin = 2;
-        #             }
-        #             else{
-        #                 $bin = 3;
-        #             }
-        #         }
-        #         #output to corresponding output bin file
-        #         print {$handles{$bin}} ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
-        #     }
-        #     for(my $i = 1; $i <= $bin_num; ++$i){
-        #         close ( $handles{$i} );
-        #     }
-        #     #train 
-        #     for(my $i = 1; $i <= $bin_num; ++$i){
-        #         $models[$i-1] = train( $seqs[$i-1] );
-        #     }
-        #     #combine individual models to make the final model file
-        #     $final_model = combineModel( \@models, $cutoffs);
-            
-        # }#more than one bin 
+                # print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
 
-        # &RunSystem( "cp $final_model $out_name", "output: $out_name\n" );
-        # push @list_of_temp, $final_model if $out_name ne $final_model;
+        else:
+            # open NEWINPUT, ">", $newseq;
+            # -----------------------------
+            # create sequence file for each bin
+            handles = SortedDict()
+            for i in range(start=1, stop=bin_num + 1):
+                with open(file=f"seq_bin_{i}", mode="r") as fh:
+                    seqs.extend((f"seq_bin_{i}"))
+                    handles[i] = fh
+            # okay, but why are we writing these to files?
+            # -----------------------------
+            # read input sequences
+            try:
+                FA = pyfaidx.Fasta(seqfile)
+                seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
+                for read in FA:
+                    if read.long_name not in seq_GC_entries:
+                        read_header = f">{read.long_name}"
+                        seq_GC[read_header] = int(GC(read[:].seq))
+                    # --------------------------------------
+                    # decide which bin the sequence belongs to
+                    #
+                    if bin_num == 2:
+                        if seq_GC[read_header] <= cutoffs[0]:
+                            bin = 1
+                        else:
+                            bin = 2
+                    else:
+                        if seq_GC[read_header] <= cutoffs[0]:
+                            bin = 1
+                        elif seq_GC[read_header] <= cutoffs[1]:
+                            bin = 2
+                        else:
+                            bin = 3
+                    # output to corresponding output bin file
+                    with open(file=handles[bin], mode="w") as fh:
+                        fh.writelines(
+                            f"{read_header}\t[gc={seq_GC[read_header]}\n{read[:].seq}\n"
+                        )
+            except:
+                print(f"Cannot open {seqfile}")
+            # train
+            for i in range(stop=bin_num):
+                models[i] = train(seqs[i])
+            # combine individual models to make the final model file
+            final_model = combineModel(models, cutoffs)
 
+        run(["cp", final_model, out_name])
+        if out_name != final_model:
+            list_of_temp.extend(final_model)
+
+    if outputformat is "GFF":
+        format_gmhmmp = " -f G "
+
+    if filterseq is 1:
+        hmm += " -b "
+    if faa:
+        hmm += f" -A {faa_out} "
+    if fnn:
+        hmm += f" -D {fnn_out} "
+    # $hmm .= " -a $faa_out " if $faa;
+    # $hmm .= " -d $fnn_out " if $fnn;
+
+    list_of_temp.extend(("with_seq.out"))
+
+    if do_iterations:
+        if motif:
+            run([hmm, "-r", "-m", out_name, "-o", output, format_gmhmmp, seqfile])
+        else:
+            # no moitf option specified
+            run([hmm, "-m", out_name, "-o", output, format_gmhmmp, seqfile])
+    else:
+        # no iterations - use heuristic only
+        run([hmm, "-m", meta_model, "-o", output, format_gmhmmp, seqfile])
+
+    # this seems stupid dangerous.
+    # TODO: replace with using tempfile.TemporaryDirectory
+    if clean:
+        for _ in list_of_temp:
+            run(["rm", "-f", _])
     pass
+
 
 def train():
     pass
+
 
 def cluster(feature_f, clusters):  # $gc_out, $bins
     gc_hash = dict()

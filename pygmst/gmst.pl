@@ -491,10 +491,10 @@ else{
     #	
     for(my $i = 1; $i <= $bin_num; ++$i){
         my $fh;
-        open ($fh, ">seq_bin_$i");
-        push(@seqs, "seq_bin_$i");
+        open ($fh, ">seq_bin_$i"); # create a file named f"seq_bin_{i}"
+        push(@seqs, "seq_bin_$i"); # extend a list to include f"seq_bin_{i}" as an element
         #push @list_of_temp, "seq_bin_$i";
-        $handles{$i} = $fh;
+        $handles{$i} = $fh; # extend a dictionary to point to the new file, with i as the key
     }
     #-----------------------------
     # read input sequences
@@ -821,6 +821,7 @@ sub cluster{
 #--------------------------------------------------------------------
 # read a fasta file on the fly. Sequence is not stored in the memory
 # ------------------------------------------------------------------
+# this should be replaced with pyfaidx, right?  Or maybe biopython SeqIO.
 sub read_fasta_seq {
    my ($fh, $seq_info) = @_;
 
