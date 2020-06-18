@@ -147,3 +147,4 @@ pygmst/MetaGeneMark_v1.mod
 pygmst/par_*
 pygmst/gmhmmp
 pygmst/GeneMark_hmm.mod
+pygmst/sequence

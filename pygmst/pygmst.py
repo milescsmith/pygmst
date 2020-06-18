@@ -6,7 +6,7 @@ import click
 import re
 import logging
 from click_option_group import optgroup
-from typing import Optional
+from typing import Optional, List
 import logging
 from subprocess import run
 import pyfaidx
@@ -22,6 +22,30 @@ MIN_HEURISTIC_GC = 30
 MAX_HEURISTIC_GC = 70
 OUTPUT_FORMAT = "LST|GFF"
 MIN_LENGTH = 10000
+
+# Not entirely sure this is the best way to include these in the module
+# but I am ignorant of how else to do so
+
+current_module = __import__(__name__)
+# GeneMark.hmm gene finding program <gmhmmp>; version 2.14
+hmm = f"{current_module.__path__[0]}/utilities/gmhmmp"
+
+# sequence parsing tool <probuild>; version 2.11c
+build = f"{current_module.__path__[0]}/utilities/probuild"
+
+# gibbs sampler - from http://bayesweb.wadsworth.org/gibbs/gibbs.html ; version 3.10.001  Aug 12 2009
+# this doesn't appear to be available from that source?
+# possible replacement at https://github.com/Etschbeijer/GibbsSampler ?
+gibbs3 = f"{current_module.__path__[0]}/utilities/Gibbs3"
+
+# MetaGeneMark model for initial prediction
+meta_model = f"{current_module.__path__[0]}/models/MetaGeneMark_v1.mod"
+
+# ------------------------------------------------
+
+# codon table alteration for GeneMark
+gm_4_tbl = f"{current_module.__path__[0]}/models/gm_4.tbl"
+gm_1_tbl = f"{current_module.__path__[0]}/models/gm_1.tbl"
 
 # TODO: redefine these as needed within the code
 minGC = 30
@@ -238,10 +262,25 @@ def main(
     version: bool = False,
 ) -> None:
     bins = int(bins)
+    motif = bool(motif)  # for compatibility
+    fixmotif = bool(motif)  # for compatibility
 
     if output is None:
         base = os.path.basename(input)
         output = os.path.splitext(base)[0]
+        if format is "LST":
+            output = f"{output}.lst"
+        elif format is "GFF":
+            output = f"{output}.gff"
+        if fnn:
+            fnn_out = f"{output}.fnn"
+        if faa:
+            faa_out = f"{output}.faa"
+    else:
+        if fnn:
+            fnn_out = f"{output}.fnn"
+        if faa:
+            faa_out = f"{output}.faa"
     if prok:
         bins = 1
         filterseq = 0
@@ -249,10 +288,9 @@ def main(
         order_non = 2
         offover = "0"
         gcode = "11"
-        fixmotif = "0"
+        fixmotif = (False,)
         prestart = 40
         width = 6
-        fixmotif = 0
     if par is None:
         par = f"par_{gcode}.default"
     if version:
@@ -289,7 +327,8 @@ def main(
     run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile} prepare sequence")
     list_of_temp.extend((seq))
 
-    sequence_size = len(seq)
+    with open(seq, "r") as _:
+        sequence_size = len(_.read())
 
     command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
     minimum_sequence_size = re.findall(
@@ -320,7 +359,9 @@ def main(
         list_of_temp.extend((gc_out))
 
         # determine bin number and range
-        bin_num, cutoffs, seq_GC = cluster(gc_out, bins)
+        bin_num, cutoffs, seq_GC = cluster(
+            feature_f=gc_out, clusters=bins, min_length=MIN_LENGTH
+        )
         # Log("bin number = $bin_num\n");
         # Log( "GC range = ".join(",",@$cutoffs)."\n" );
 
@@ -333,7 +374,21 @@ def main(
         seqs = []
         # my %handles; # file handles for n bins.
         if bin_num == 1:
-            final_model = train(seqfile)
+            final_model = train(
+                input_seq=seqfile,
+                seq=seq,
+                motif=motif,
+                fixmotif=fixmotif,
+                order=order,
+                order_non=order_non,
+                start_prefix=start_prefix,
+                gibbs_prefix=gibbs_prefix,
+                prestart=prestart,
+                width=width,
+                build_cmd=build,
+                hmm_cmd=hmm,
+                list_of_temp=list_of_temp,
+            )
             # -----------------------------
             # make a GC file for the input file
             # open NEWINPUT, ">", $newseq;
@@ -392,7 +447,21 @@ def main(
                 print(f"Cannot open {seqfile}")
             # train
             for i in range(stop=bin_num):
-                models[i] = train(seqs[i])
+                models[i] = train(
+                    input_seq=seqs[i],
+                    seq=seq,
+                    motif=motif,
+                    fixmotif=fixmotif,
+                    order=order,
+                    order_non=order_non,
+                    start_prefix=start_prefix,
+                    gibbs_prefix=gibbs_prefix,
+                    prestart=prestart,
+                    width=width,
+                    build_cmd=build,
+                    hmm_cmd=hmm,
+                    list_of_temp=list_of_temp,
+                )
             # combine individual models to make the final model file
             final_model = combineModel(models, cutoffs)
 
@@ -432,11 +501,161 @@ def main(
     pass
 
 
-def train():
-    pass
+def train(
+    input_seq: str,
+    seq: str,
+    motif: bool,
+    fixmotif: bool,
+    order: int,
+    order_non: int,
+    start_prefix: str,
+    gibbs_prefix: str,
+    prestart: int,
+    width: int,
+    build_cmd: str,
+    hmm_cmd: str,
+    list_of_temp: List[str],
+):
+    # ------------------------------------------------
+    # prepare sequence
+    run(
+        [build_cmd, "--clean_join", seq, "--seq", input_seq,]
+    )
+    # TODO: another thing to restore when we figure out logging.
+    # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile])
+
+    # ------------------------------------------------
+    # tmp solution: get sequence size, get minimum sequence size from --par <file>
+    # compare, skip iterations if short
+
+    with open(seq, "r") as _:
+        sequence_size = len(_.read())
+
+    command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
+    minimum_sequence_size = re.findall(
+        pattern="\s*--MIN_SEQ_SIZE\s+", string=str(command.stdout, "utf=8")
+    )[0]
+
+    do_iterations = True
+
+    if sequence_size < minimum_sequence_size:
+        run(
+            [
+                build_cmd,
+                "--clean_join",
+                seq,
+                "--seq",
+                input_seq,
+                "--MIN_CONTIG_SIZE",
+                0,
+                "--GAP_FILLER",
+            ]
+        )
+        # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile, "--MIN_CONTIG_SIZE", 0, "--GAP_FILLER"])
+        do_iterations = False
+
+    # Log("do_iterations = $do_iterations\n")
+
+    # ------------------------------------------------
+    # run initial prediction
+    itr = 0
+    next_item = GetNameForNext(itr)
+    print("run initial prediction")
+    run([hmm_cmd, seq, "-m", meta_model, "-o", next_item])
+    # TODO: tempfile
+    list_of_temp.extend((next_item))
+
+    # ------------------------------------------------
+    # enter iterations loop
+
+    # TODO: logfile
+    # &Log( "entering iteration loop\n" );
+
+    while do_iterations:
+        itr += 1
+        mod = GetNameForMod(itr)
+
+        if motif and not fixmotif:
+            start_seq = f"{start_prefix}{itr}"
+            gibbs_out = f"{gibbs_prefix}{itr}"
+
+        command = f"{build_cmd} --mkmod {mod} --seq {seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
+
+        if motif and not fixmotif:
+            command += f" --pre_start {start_seq} --PRE_START_WIDTH {prestart}"
+        elif motif and fixmotif:
+            command += f" --fixmotif --PRE_START_WIDTH {prestart} --width {width}"
+            # command += f" --fixmotif --PRE_START_WIDTH {prestart} --width {width} --log {logfile}"
+
+        print(f"build model: $mod for iteration: {itr}")
+        run(command.split())
+        list_of_temp.extend((mod))
+
+        if (
+            motif and not fixmotif
+        ):  # given that we only have Gibbs3, don't *really* have an option
+            # if $gibbs_version == 1:
+            #     &RunSystem( "$gibbs $start_seq $width -n > $gibbs_out", "run gibbs sampler\n" )
+            # elif $gibbs_version == 3:
+            #     &RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" )
+            print("run gibbs3 sampler")
+            run(
+                [
+                    gibbs3,
+                    start_seq,
+                    width,
+                    "-o",
+                    gibbs_out,
+                    "-F",
+                    "-Z",
+                    "-n",
+                    "-r",
+                    "-y",
+                    "-x",
+                    "-m",
+                    "-s",
+                    "1",
+                    "-w",
+                    "0.01",
+                ]
+            )
+
+            list_of_temp.extend((start_seq))
+
+            print("make prestart model")
+            # TODO: logfile
+            # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
+            run(
+                [build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq,]
+            )
+            list_of_temp.extend((gibbs_out))
+
+        prev = next_item
+        next_item = GetNameForNext(itr)
+
+        command = f"{hmm_cmd} {seq} -m {mod} -o {next_item}"
+        if motif:
+            command += " -r"
+
+        print(f"prediction, iteration: {itr}")
+        run(command.split())
+        list_of_temp.extend((next_item))
+
+        command = f"{build_cmd} --compare --source {next_item} --target {prev}"
+        # &Log( "compare:\n" . $command . "\n" );
+
+        diff = run(command.split(), capture_output=True).strip()
+        # &Log( "compare $prev and $next_item: $diff\n" );
+
+        if diff >= identity:
+            # &Log( "Stopped iterations on identity: $diff\n" );
+            last
+        if itr == maxitr:
+            # &Log( "Stopped iterations on maximum number: $maxitr\n" )
+            last
 
 
-def cluster(feature_f, clusters):  # $gc_out, $bins
+def cluster(feature_f, clusters, min_length=10000):  # $gc_out, $bins
     gc_hash = dict()
     cut_off_points = list()
     num_of_seq = 0
@@ -447,6 +666,7 @@ def cluster(feature_f, clusters):  # $gc_out, $bins
         # read in probuild output, line by line.  Should be fasta input.
         for line in GC:
             # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
+            # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
             text = re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
             if text:
                 header = text.group(1)  # Reference name
@@ -502,14 +722,14 @@ def cluster(feature_f, clusters):  # $gc_out, $bins
             # &Log( "Total number of sequences is not enough for training in 3 clusters!\n" )
             clusters = 1
         else:
-            if gc_hash[one_third] > MIN_LENGTH:
+            if gc_hash[one_third] > min_length:
                 cut_off_points.extend((min_GC, one_third, two_third, max_GC))
             else:
                 # &Log( "Total length of sequences is not enough for training in 3 clusters!\n" )
                 clusters = 2
 
     if clusters == 2:
-        if gc_hash[one_half] > MIN_LENGTH:
+        if gc_hash[one_half] > min_length:
             cut_off_points.extend((min_GC, one_half, max_GC))
         else:
             # &Log( "Total length of sequences is not enough for training in 2 clusters!\n" )
