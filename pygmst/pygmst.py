@@ -4,15 +4,14 @@ import sys
 import os
 import click
 import re
-import logging
+# import logging
 from click_option_group import optgroup
 from typing import Optional, List, Tuple, Dict
-import logging
 from subprocess import run
 import pyfaidx
 from Bio.SeqUtils import GC as getGC
 from sortedcontainers import SortedDict
-from tempfile import TemporaryDirectory
+import tempfile
 
 BINS = "1|2|3|0"
 SHAPE_TYPE = "linear|circular|partial"
@@ -23,33 +22,24 @@ MAX_HEURISTIC_GC = 70
 OUTPUT_FORMAT = "LST|GFF"
 MIN_LENGTH = 10000
 
-# Not entirely sure this is the best way to include these in the module
-# but I am ignorant of how else to do so
-
-current_module = __import__(__name__)
-# GeneMark.hmm gene finding program <gmhmmp>; version 2.14
-hmm = f"{current_module.__path__[0]}/utilities/gmhmmp"
-
-# sequence parsing tool <probuild>; version 2.11c
-build = f"{current_module.__path__[0]}/utilities/probuild"
-
-# gibbs sampler - from http://bayesweb.wadsworth.org/gibbs/gibbs.html ; version 3.10.001  Aug 12 2009
-# this doesn't appear to be available from that source?
-# possible replacement at https://github.com/Etschbeijer/GibbsSampler ?
-gibbs3 = f"{current_module.__path__[0]}/utilities/Gibbs3"
-
 # MetaGeneMark model for initial prediction
-meta_model = f"{current_module.__path__[0]}/models/MetaGeneMark_v1.mod"
-
 # ------------------------------------------------
 
-# codon table alteration for GeneMark
-gm_4_tbl = f"{current_module.__path__[0]}/models/gm_4.tbl"
-gm_1_tbl = f"{current_module.__path__[0]}/models/gm_1.tbl"
-
 # TODO: redefine these as needed within the code
-metaout = "meta.lst"
-logfile = "gms.log"
+global seq
+global start_prefix
+global gibbs_prefix
+global mod_prefix
+global mod_suffix
+global hmmout_prefix
+global hmmout_suffix
+global out_name
+global fnn_out
+global faa_out 
+
+global meta_out
+global gc_out
+
 seq = "sequence"
 start_prefix = "startseq."
 gibbs_prefix = "gibbs_out."
@@ -58,9 +48,6 @@ mod_suffix = ".mod"
 hmmout_prefix = "itr_"
 hmmout_suffix = ".lst"
 out_name = "GeneMark_hmm.mod"
-out_name_heuristic = "GeneMark_hmm_heuristic.mod"
-out_suffix = "_hmm.mod"
-out_suffix_heu = "_hmm_heuristic.mod"
 fnn_out = ""
 faa_out = ""
 
@@ -107,14 +94,13 @@ verbose = False
     default=True,
     show_default=True,
 )
-
-# # Run options:
+# Run options:
 @optgroup.group("Run options")
 @optgroup.option(
     "--bins",
     type=click.Choice(["0", "1", "2", "3"]),
     help="number of clusters for inhomogeneous genome. Use 0 for automatic clustering",
-    default=0,
+    default="0",
     show_default=True,
 )
 @optgroup.option(
@@ -150,7 +136,7 @@ verbose = False
     "--gcode",
     type=click.Choice(["11", "4", "1"]),
     help="genetic code.  See https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi for codes.  Currently, only tables 1, 4, and 11 are allowed.",
-    default=1,
+    default="1",
     show_default=True,
 )
 @optgroup.option(
@@ -158,14 +144,14 @@ verbose = False
     type=click.Choice(["0", "1"]),
     help="iterative search for a sequence motif associated with CDS start",
     show_default=True,
-    default=1,
+    default="1",
 )
 @optgroup.option(
     "--width",
     type=click.IntRange(3, 100),
     help="motif width",
     show_default=True,
-    default=1,
+    default=12,
 )
 @optgroup.option(
     "--prestart",
@@ -208,7 +194,7 @@ verbose = False
 @optgroup.option(
     "--gibbs",
     type=click.Choice(["1", "3"]),
-    default=3,
+    default="3",
     help="version of Gibbs sampler software (default: 3 supported versions: 1 and 3 )",
     show_default=True,
 )
@@ -229,7 +215,7 @@ verbose = False
 )
 @optgroup.option("--verbose", is_flag=True, default=False, show_default=True)
 @optgroup.option("--version", is_flag=True, default=False, show_default=True)
-@click.argument("seqfile", type=click.File("rb"))
+@click.argument("seqfile", type=str)
 @click.help_option(show_default=True)
 # @Log(verbose)
 def main(
@@ -239,14 +225,14 @@ def main(
     fnn: bool = False,
     faa: bool = False,
     clean: bool = True,
-    bins: int = 0,
+    bins: str = "0",
     prok: bool = False,
     filterseq: int = 1,
     strand: str = "both",
     order: int = 4,
     order_non: int = 2,
     gcode: str = "1",
-    motif: int = 1,
+    motif: str = "1",
     width: int = 12,
     prestart: int = 6,
     fixmotif: int = 1,
@@ -263,12 +249,21 @@ def main(
     motif = bool(motif)  # for compatibility
     fixmotif = bool(fixmotif)  # for compatibility
 
+     # Not entirely sure this is the best way to include these in the module
+    # but I am ignorant of how else to do so
+
+    current_module = __import__(__name__)
+    if current_module.__name__ != "__main__":
+        working_path = current_module.__path__[0]
+    else:
+        working_path = os.getcwd()
+
     if output is None:
         base = os.path.basename(input)
         output = os.path.splitext(base)[0]
-        if format is "LST":
+        if format == "LST":
             output = f"{output}.lst"
-        elif format is "GFF":
+        elif format == "GFF":
             output = f"{output}.gff"
         if fnn:
             fnn_out = f"{output}.fnn"
@@ -290,15 +285,26 @@ def main(
         prestart = 40
         width = 6
     if par is None:
-        par = f"par_{gcode}.default"
+        par = f"{working_path}/pygmst/models/par_{gcode}.default"
     if version:
         print(f"{__version__}")
     if verbose:
         # TODO: add actual logging
         # log = logging.basicConfig(filename='gmst.log', level=logging.INFO)
         pass
-    # ------------------------------------------------
-    # more variables/settings
+    
+   
+
+    # GeneMark.hmm gene finding program <gmhmmp>; version 2.14
+    hmm = f"{working_path}/pygmst/utilities/gmhmmp"
+
+    # sequence parsing tool <probuild>; version 2.11c
+    build = f"{working_path}/pygmst/utilities/probuild"
+
+    # gibbs sampler - from http://bayesweb.wadsworth.org/gibbs/gibbs.html ; version 3.10.001  Aug 12 2009
+    # this doesn't appear to be available from that source?
+    # possible replacement at https://github.com/Etschbeijer/GibbsSampler ?
+    gibbs3 = f"{working_path}/pygmst/utilities/Gibbs3"
 
     # use <probuild> with GeneMarkS parameter file <$par>
     build = f"{build} --par {par}"
@@ -327,15 +333,15 @@ def main(
     # this should end up as something like
     # 'probuild --par par_1.default --clean_join sequence --seq test.fa
     run(f"{build} --clean_join {seq} --seq {seqfile}".split())
-    list_of_temp.extend((seq))
+    list_of_temp.extend((seqfile))
 
-    with open(seq, "r") as _:
+    with open(seqfile, "r") as _:
         sequence_size = len(_.read())
 
     command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
-    minimum_sequence_size = re.findall(
-        pattern="\s*--MIN_SEQ_SIZE\s+", string=str(command.stdout, "utf=8")
-    )[0]
+    minimum_sequence_size = int(re.findall(
+        pattern="\s*--MIN_SEQ_SIZE\s+(\d+)", string=str(command.stdout, "utf=8")
+    )[0])
 
     do_iterations = 1
 
@@ -351,6 +357,8 @@ def main(
 
         # get GC of whole sequence for each sequence"
         # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
+        gc_out = tempfile.NamedTemporaryFile()
+
         run(args=f"{build} --stat_fasta --seq {seqfile} > {gc_out}".split())
         list_of_temp.extend((gc_out))
 
@@ -386,6 +394,7 @@ def main(
                 par=par,
                 maxitr=maxitr,
                 identity=identity,
+                gibbs3=gibbs3,
             )
             list_of_temp.extend(new_tmp_files)
             # -----------------------------
@@ -459,6 +468,7 @@ def main(
                     par=par,
                     maxitr=maxitr,
                     identity=identity,
+                    gibbs3=gibbs3,
                 )
                 list_of_temp.extend(new_tmp_files)
             # combine individual models to make the final model file
@@ -489,6 +499,7 @@ def main(
             # no moitf option specified
             run(f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
     else:
+        meta_model = f"{current_module.__path__[0]}/models/MetaGeneMark_v1.mod"
         # no iterations - use heuristic only
         run(f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}".split())
 
@@ -512,10 +523,11 @@ def train(
     prestart: int, # 6
     width: int, # 12
     build_cmd: str, # "probuild --par par_1.default"
-    hmm_cmd: str, # "gmhmmp -s -d"
+    hmm_cmd: str, # "gmhmmp -s d"
     par: str, # "par_1.default"
     maxitr: int, # 10
     identity: float, # 0.99
+    gibbs3: str,
 ) -> Tuple[str, List[str]]:
     tmp_files: List[str] = list()
     # ------------------------------------------------
@@ -535,10 +547,10 @@ def train(
     with open(seq, "r") as _:
         sequence_size = len(_.read())
 
-    min_size_find_cmd = run(args=[f"grep MIN_SEQ_SIZE {par}".split()], capture_output=True)
-    minimum_sequence_size = re.findall(
-        pattern="\s*--MIN_SEQ_SIZE\s+", string=str(min_size_find_cmd.stdout, "utf=8")
-    )[0]
+    min_size_find_cmd = run(args=f"grep MIN_SEQ_SIZE {par}".split(), capture_output=True)
+    minimum_sequence_size = int(re.findall(
+        pattern="\s*--MIN_SEQ_SIZE\s+(\d+)", string=str(min_size_find_cmd.stdout, "utf=8")
+    )[0])
 
     do_iterations = True
 
@@ -556,10 +568,12 @@ def train(
     next_item = f"{hmmout_prefix}{itr}{hmmout_suffix}"
     print("run initial prediction")
 
-    # form of! `gmhmmp -s -d sequence -m MetaGeneMark_v1.mod -o itr_{itr}.lst`
-    run(f"{hmm_cmd} {seq} -m {meta_model} -o {next_item}".split())
+    # form of! `gmhmmp -s d sequence -m MetaGeneMark_v1.mod -o itr_{itr}.lst`
+    print(f"{hmm_cmd} -m {os.path.abspath('../models/MetaGeneMark_v1.mod')} -o {next_item} {seq}")
+    run(f"{hmm_cmd} -m {os.path.abspath('../models/MetaGeneMark_v1.mod')} -o {next_item} {seq}".split())
     # TODO: tempfile
-    tmp_files.extend((next_item))
+    print(f"Next item up for bid is: {next_item}")
+    tmp_files.extend([next_item])
 
     # ------------------------------------------------
     # enter iterations loop
@@ -587,7 +601,8 @@ def train(
 
         print(f"build model: {mod} for iteration: {itr}")
         run(command.split())
-        tmp_files.extend((mod))
+        print(f"Next item up for bid is: {mod}")
+        tmp_files.extend([mod])
 
         if (
             motif and not fixmotif
@@ -599,14 +614,17 @@ def train(
             print("run gibbs3 sampler")
             # form of! 'Gibbs3 startseq.{itr} 12 -o gibbs_out.{itr} -F -Z -n -r -y -x -m -s 1 -w 0.01"
             run(f"{gibbs3} {start_seq} {width} -o {gibbs_out} -F -Z -n -r -y -x -m -s 1 -w 0.01".split())
-            tmp_files.extend((start_seq))
+            print(f"Next item up for bid is: {start_seq}")
+            tmp_files.extend([start_seq])
 
             print("make prestart model")
             # TODO: logfile
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
             # form of! `probuild --par par_1.default --gibs gibbs_out.{itr} --mod itr_{itr}.mod --seq startseq.{itr}
+            print(f"{build_cmd} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}")
             run(f"{build_cmd} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}".split())
-            tmp_files.extend((gibbs_out))
+            print(f"Next item up for bid is: {gibbs_out}")
+            tmp_files.extend([gibbs_out])
 
         prev = next_item
         # next_item = itr_{itr}.lst
@@ -620,17 +638,22 @@ def train(
             command += " -r"
 
         print(f"prediction, iteration: {itr}")
+        print(command)
         run(command.split())
-        tmp_files.extend((next_item))
+        print(f"Next item up for bid is: {next_item}")
+        tmp_files.extend([next_item])
+        print(tmp_files)
 
         # `probuild --par par_1.default --compare --source itr_{itr}.lst --target itr_{itr-1}.lst
         command = f"{build_cmd} --compare --source {next_item} --target {prev}"
+        print(command)
         # &Log( "compare:\n" . $command . "\n" );
 
-        diff = str(run(command.split(), capture_output=True).stdout).strip()
+        diff = str(run(command.split(), capture_output=True).stdout, 'utf-8').strip("\n")
+        print(diff)
         # &Log( "compare $prev and $next_item: $diff\n" );
 
-        if diff >= identity:
+        if float(diff) >= identity:
             # &Log( "Stopped iterations on identity: $diff\n" );
             do_iterations = False
         if itr == maxitr:
@@ -641,35 +664,35 @@ def train(
 
 def cluster(
     feature_f: str, clusters: int, min_length: int = 10000
-) -> Tuple[int, List[int, int], Dict(str, int)]:  # $gc_out, $bins
+) -> Tuple[int, List[int], Dict[str, int]]:  # $gc_out, $bins
     gc_hash: Dict[int, int] = dict()
-    cut_off_points = list()
+    cut_off_points: List[int] = list()
     num_of_seq = 0
     total_length = 0
     header_to_cod_GC = dict()
 
-    with open(feature_f, "r") as GC:
+    # with feature_f as GC:
         # read in probuild output, line by line.  Should be fasta input.
-        for line in GC:
-            # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
-            # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
-            text = re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
-            if text:
-                header = text.group(1)  # Reference name
-                length = int(text.group(2))  # length of sequence?
-                GC = int(text.group(3))  # must be GC percentage
-                header_re = re.search(
-                    pattern="^(.*?)\t", string=line
-                )  # Dont get this one - didn't we already extract just this capture group?
-                if header_re:
-                    header = header_re.group(1)
-                header_to_cod_GC[header] = GC
-                num_of_seq += 1
-                total_length += length
-                if GC in gc_hash:
-                    gc_hash[GC] += length
-                else:
-                    gc_hash[GC] = length
+    for line in feature_f:
+        # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
+        # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
+        text = re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
+        if text:
+            header = text.group(1)  # Reference name
+            length = int(text.group(2))  # length of sequence?
+            GC = int(text.group(3))  # must be GC percentage
+            header_re = re.search(
+                pattern="^(.*?)\t", string=line
+            )  # Dont get this one - didn't we already extract just this capture group?
+            if header_re:
+                header = header_re.group(1)
+            header_to_cod_GC[header] = GC
+            num_of_seq += 1
+            total_length += length
+            if GC in gc_hash:
+                gc_hash[GC] += length
+            else:
+                gc_hash[GC] = length
 
     sorted_GC = SortedDict(gc_hash)  # sort the gc_hash dictionary by keys
     min_GC = sorted_GC.values()[0]
