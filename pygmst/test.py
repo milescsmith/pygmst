@@ -1,6 +1,6 @@
 import sys
 import click
-from logger import Log
+from logger import Logipy
 
 verbose = False
 

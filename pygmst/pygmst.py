@@ -6,11 +6,11 @@ import click
 import re
 import logging
 from click_option_group import optgroup
-from typing import Optional, List
+from typing import Optional, List, Tuple, Dict
 import logging
 from subprocess import run
 import pyfaidx
-from Bio.SeqUtils import GC
+from Bio.SeqUtils import GC as getGC
 from sortedcontainers import SortedDict
 from tempfile import TemporaryDirectory
 
@@ -233,7 +233,7 @@ verbose = False
 @optgroup.option("--version", is_flag=True, default=False, show_default=True)
 @click.argument("seqfile", type=click.File("rb"))
 @click.help_option(show_default=True)
-@Log(verbose)
+# @Log(verbose)
 def main(
     seqfile: str,
     output: str,
@@ -247,12 +247,12 @@ def main(
     strand: str = "both",
     order: int = 4,
     order_non: int = 2,
-    gcode: int = 1,
+    gcode: str = "1",
     motif: int = 1,
     width: int = 12,
     prestart: int = 6,
     fixmotif: int = 1,
-    offover: int = 1,
+    offover: bool = True,
     par: Optional[str] = None,
     gibbs: int = 3,
     test: bool = False,
@@ -263,7 +263,7 @@ def main(
 ) -> None:
     bins = int(bins)
     motif = bool(motif)  # for compatibility
-    fixmotif = bool(motif)  # for compatibility
+    fixmotif = bool(fixmotif)  # for compatibility
 
     if output is None:
         base = os.path.basename(input)
@@ -286,9 +286,9 @@ def main(
         filterseq = 0
         order = 2
         order_non = 2
-        offover = "0"
+        offover = False
         gcode = "11"
-        fixmotif = (False,)
+        fixmotif = False
         prestart = 40
         width = 6
     if par is None:
@@ -317,14 +317,18 @@ def main(
     elif strand == "reverse":
         hmm = f"{hmm} -s r "
 
-    list_of_temp = []
+    list_of_temp: List[str] = list()
     GC = 0
 
     # ------------------------------------------------
     ## tmp solution: get sequence size, get minimum sequence size from --par <file>
     ## compare, skip iterations if short
 
-    run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile} prepare sequence")
+    # run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile}")
+
+    # this should end up as something like
+    # 'probuild --par par_1.default --clean_join sequence --seq test.fa
+    run(f"{build} --clean_join {seq} --seq {seqfile}")
     list_of_temp.extend((seq))
 
     with open(seq, "r") as _:
@@ -345,17 +349,11 @@ def main(
         # clustering
 
         # initial prediction using MetaGeneMark model
-        # &RunSystem( "$hmm -m $meta_model -o $meta_out -d $seqfile -b" );
         list_of_temp.extend((meta_out, f"{meta_out}.fna"))
 
-        # &RunSystem( "$build --stat_fasta $gc_out --seq $meta_out.fna " );
-        # &RunSystem( "$build --stat_fasta --seq $meta_out.fna > $gc_out " );#get GC of coding region for each sequence
-        gc_out = str(
-            run(
-                args=[build, "--stat_fasta", "--seq", seqfile], capture_output=True
-            ).stdout,
-            "utf-8",
-        )  # get GC of whole sequence for each sequence
+        # get GC of whole sequence for each sequence"
+        # 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
+        run(args=[build, "--stat_fasta", "--seq", seqfile, ">", gc_out], capture_output=True)
         list_of_temp.extend((gc_out))
 
         # determine bin number and range
@@ -371,10 +369,10 @@ def main(
         # my $final_model;
         # my @seqs;
         models = dict()
-        seqs = []
+        seqs: List[str] = list()
         # my %handles; # file handles for n bins.
         if bin_num == 1:
-            final_model = train(
+            final_model, new_tmp_files = train(
                 input_seq=seqfile,
                 seq=seq,
                 motif=motif,
@@ -387,8 +385,11 @@ def main(
                 width=width,
                 build_cmd=build,
                 hmm_cmd=hmm,
-                list_of_temp=list_of_temp,
+                par=par,
+                maxitr=maxitr,
+                identity=identity,
             )
+            list_of_temp.extend(new_tmp_files)
             # -----------------------------
             # make a GC file for the input file
             # open NEWINPUT, ">", $newseq;
@@ -399,22 +400,19 @@ def main(
                 seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
                 for read in FA:
                     if read.long_name not in seq_GC_entries:
-                        seq_GC[f">{read.long_name}"] = int(GC(read[:].seq))
+                        seq_GC[f">{read.long_name}"] = int(getGC(read[:].seq))
             except:
                 print(f"Cannot open {seqfile}")
                 # print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
 
         else:
-            # open NEWINPUT, ">", $newseq;
-            # -----------------------------
             # create sequence file for each bin
             handles = SortedDict()
             for i in range(start=1, stop=bin_num + 1):
-                with open(file=f"seq_bin_{i}", mode="r") as fh:
+                with open(file=f"seq_bin_{i}", mode="w") as fh:
                     seqs.extend((f"seq_bin_{i}"))
                     handles[i] = fh
-            # okay, but why are we writing these to files?
-            # -----------------------------
+
             # read input sequences
             try:
                 FA = pyfaidx.Fasta(seqfile)
@@ -422,10 +420,9 @@ def main(
                 for read in FA:
                     if read.long_name not in seq_GC_entries:
                         read_header = f">{read.long_name}"
-                        seq_GC[read_header] = int(GC(read[:].seq))
-                    # --------------------------------------
+                        seq_GC[read_header] = int(getGC(read[:].seq))
+
                     # decide which bin the sequence belongs to
-                    #
                     if bin_num == 2:
                         if seq_GC[read_header] <= cutoffs[0]:
                             bin = 1
@@ -438,6 +435,7 @@ def main(
                             bin = 2
                         else:
                             bin = 3
+
                     # output to corresponding output bin file
                     with open(file=handles[bin], mode="w") as fh:
                         fh.writelines(
@@ -447,7 +445,7 @@ def main(
                 print(f"Cannot open {seqfile}")
             # train
             for i in range(stop=bin_num):
-                models[i] = train(
+                models[i], new_tmp_files = train(
                     input_seq=seqs[i],
                     seq=seq,
                     motif=motif,
@@ -460,8 +458,11 @@ def main(
                     width=width,
                     build_cmd=build,
                     hmm_cmd=hmm,
-                    list_of_temp=list_of_temp,
+                    par=par,
+                    maxitr=maxitr,
+                    identity=identity,
                 )
+            list_of_temp.extend(new_tmp_files)
             # combine individual models to make the final model file
             final_model = combineModel(models, cutoffs)
 
@@ -514,13 +515,14 @@ def train(
     width: int,
     build_cmd: str,
     hmm_cmd: str,
-    list_of_temp: List[str],
+    par: str,
+    maxitr: int,
+    identity: float,
 ):
+    tmp_files: List[str] = list()
     # ------------------------------------------------
     # prepare sequence
-    run(
-        [build_cmd, "--clean_join", seq, "--seq", input_seq,]
-    )
+    run([build_cmd, "--clean_join", seq, "--seq", input_seq])
     # TODO: another thing to restore when we figure out logging.
     # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile])
 
@@ -531,9 +533,9 @@ def train(
     with open(seq, "r") as _:
         sequence_size = len(_.read())
 
-    command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
+    min_size_find_cmd = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
     minimum_sequence_size = re.findall(
-        pattern="\s*--MIN_SEQ_SIZE\s+", string=str(command.stdout, "utf=8")
+        pattern="\s*--MIN_SEQ_SIZE\s+", string=str(min_size_find_cmd.stdout, "utf=8")
     )[0]
 
     do_iterations = True
@@ -559,11 +561,11 @@ def train(
     # ------------------------------------------------
     # run initial prediction
     itr = 0
-    next_item = GetNameForNext(itr)
+    next_item = f"{hmmout_prefix}{itr}{hmmout_suffix}"
     print("run initial prediction")
     run([hmm_cmd, seq, "-m", meta_model, "-o", next_item])
     # TODO: tempfile
-    list_of_temp.extend((next_item))
+    tmp_files.extend((next_item))
 
     # ------------------------------------------------
     # enter iterations loop
@@ -573,7 +575,7 @@ def train(
 
     while do_iterations:
         itr += 1
-        mod = GetNameForMod(itr)
+        mod = f"{mod_prefix}{itr}{mod_suffix}"
 
         if motif and not fixmotif:
             start_seq = f"{start_prefix}{itr}"
@@ -582,14 +584,14 @@ def train(
         command = f"{build_cmd} --mkmod {mod} --seq {seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
 
         if motif and not fixmotif:
-            command += f" --pre_start {start_seq} --PRE_START_WIDTH {prestart}"
+            command = f"{command} --pre_start {start_seq} --PRE_START_WIDTH {prestart}"
         elif motif and fixmotif:
-            command += f" --fixmotif --PRE_START_WIDTH {prestart} --width {width}"
+            command = f"{command} --fixmotif --PRE_START_WIDTH {prestart} --width {width}"
             # command += f" --fixmotif --PRE_START_WIDTH {prestart} --width {width} --log {logfile}"
 
         print(f"build model: $mod for iteration: {itr}")
         run(command.split())
-        list_of_temp.extend((mod))
+        tmp_files.extend((mod))
 
         if (
             motif and not fixmotif
@@ -620,18 +622,16 @@ def train(
                 ]
             )
 
-            list_of_temp.extend((start_seq))
+            tmp_files.extend((start_seq))
 
             print("make prestart model")
             # TODO: logfile
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
-            run(
-                [build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq,]
-            )
-            list_of_temp.extend((gibbs_out))
+            run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq])
+            tmp_files.extend((gibbs_out))
 
         prev = next_item
-        next_item = GetNameForNext(itr)
+        next_item = f"{hmmout_prefix}{itr}{hmmout_suffix}"
 
         command = f"{hmm_cmd} {seq} -m {mod} -o {next_item}"
         if motif:
@@ -639,7 +639,7 @@ def train(
 
         print(f"prediction, iteration: {itr}")
         run(command.split())
-        list_of_temp.extend((next_item))
+        tmp_files.extend((next_item))
 
         command = f"{build_cmd} --compare --source {next_item} --target {prev}"
         # &Log( "compare:\n" . $command . "\n" );
@@ -649,14 +649,15 @@ def train(
 
         if diff >= identity:
             # &Log( "Stopped iterations on identity: $diff\n" );
-            last
+            do_iterations = False
         if itr == maxitr:
             # &Log( "Stopped iterations on maximum number: $maxitr\n" )
-            last
+            do_iterations = False
+    return mod, tmp_files
 
 
-def cluster(feature_f, clusters, min_length=10000):  # $gc_out, $bins
-    gc_hash = dict()
+def cluster(feature_f: str, clusters: int, min_length: int = 10000):  # $gc_out, $bins
+    gc_hash: Dict[int, int] = dict()
     cut_off_points = list()
     num_of_seq = 0
     total_length = 0
@@ -740,9 +741,38 @@ def cluster(feature_f, clusters, min_length=10000):  # $gc_out, $bins
     return clusters, cut_off_points, header_to_cod_GC
 
 
+# -----------------------------------------------
+# concatenate model files into one in MGM format:
+# starts with "__GC" and ends with "end"
+# -----------------------------------------------
+
+
+def combineModel(mod: int, cut_offs: List[int], minGC: int, maxGC: int):
+    # change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
+    cut_offs[0] = minGC
+    cut_offs[-1] = maxGC
+
+    b = 1
+    data = str()
+    with open(file="final_model", mode="w") as model:
+        for i in range(minGC, maxGC + 1):
+            model.write(f"__GC{i}\t\n")
+            if i == cut_offs[b] or i == maxGC:
+                with open(file=mod[b - 1], mode="r") as fh:
+                    for line in fh:
+                        if "NAME" in line:
+                            line.strip()
+                            line = f"{line}_GC<={i}\n"
+                        data += line
+                model.write(data)
+                model.write("end \t\n\n")
+            if b > len(mod):
+                break
+            b += 1
+    return "final_model"
+
+
 if __name__ == "__main__":
     if "--verbose" in sys.argv:
         verbose = True
     sys.exit(main())  # pragma: no cover
-
-# bin_num, cutoffs, seq_GC = cluster('initial.meta.lst.feature', 2)

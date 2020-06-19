@@ -821,7 +821,7 @@ sub cluster{
 #--------------------------------------------------------------------
 # read a fasta file on the fly. Sequence is not stored in the memory
 # ------------------------------------------------------------------
-# this should be replaced with pyfaidx, right?  Or maybe biopython SeqIO.
+# replacing with the pyfaidx module
 sub read_fasta_seq {
    my ($fh, $seq_info) = @_;
 
@@ -908,6 +908,7 @@ sub combineModel{
 #-----------------------------------------------
 # $gm_1_tbl $gm_4_tbl
 #-----------------------------------------------
+# okay, so this is never called
 sub CopyCodonTableForGeneMark
 {
   my ( $code ) = @_;
@@ -929,6 +930,7 @@ sub CopyCodonTableForGeneMark
 #-----------------------------------------------
 # $hmmout_prefix $hmmout_suffix
 #-----------------------------------------------
+# used twice, skipping
 sub GetNameForNext
 {
   my ( $name ) = @_;
@@ -937,12 +939,14 @@ sub GetNameForNext
 #-----------------------------------------------
 # mod_prefix $mod_suffix
 #-----------------------------------------------
+# used once, skipping
 sub GetNameForMod
 {
   my ( $name ) = @_;
   return  $mod_prefix . $name . $mod_suffix;
 }
 #-----------------------------------------------
+# Going to use the subprocess functions, skipping
 sub RunSystem
 {
   my( $com, $text ) = @_;
@@ -961,6 +965,7 @@ sub RunSystem
 #-----------------------------------------------
 # $verbose $logfile
 #-----------------------------------------------
+# will use the logging module, skipping
 sub Log
 {
   my( $text ) = @_;
@@ -973,6 +978,7 @@ sub Log
 # $shared_dir
 # "/par_" ".default"
 #-----------------------------------------------
+# not used
 sub GetParFileName
 {
   my( $code ) = @_;
@@ -982,6 +988,7 @@ sub GetParFileName
 # $MIN_HEURISTIC_GC $MAX_HEURISTIC_GC
 # "/heu_" "_"
 #------------------------------------------------
+# only used in the SelfTestRequired function, which will be substituted
 sub GetHeuristicFileName
 {
   my( $GC, $code, $dir, $ext, $ord ) = @_;
