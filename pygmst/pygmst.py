@@ -48,8 +48,6 @@ gm_4_tbl = f"{current_module.__path__[0]}/models/gm_4.tbl"
 gm_1_tbl = f"{current_module.__path__[0]}/models/gm_1.tbl"
 
 # TODO: redefine these as needed within the code
-minGC = 30
-maxGC = 70
 metaout = "meta.lst"
 logfile = "gms.log"
 seq = "sequence"
@@ -328,7 +326,7 @@ def main(
 
     # this should end up as something like
     # 'probuild --par par_1.default --clean_join sequence --seq test.fa
-    run(f"{build} --clean_join {seq} --seq {seqfile}")
+    run(f"{build} --clean_join {seq} --seq {seqfile}".split())
     list_of_temp.extend((seq))
 
     with open(seq, "r") as _:
@@ -352,8 +350,8 @@ def main(
         list_of_temp.extend((meta_out, f"{meta_out}.fna"))
 
         # get GC of whole sequence for each sequence"
-        # 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
-        run(args=[build, "--stat_fasta", "--seq", seqfile, ">", gc_out], capture_output=True)
+        # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
+        run(args=f"{build} --stat_fasta --seq {seqfile} > {gc_out}".split())
         list_of_temp.extend((gc_out))
 
         # determine bin number and range
@@ -368,7 +366,7 @@ def main(
 
         # my $final_model;
         # my @seqs;
-        models = dict()
+        models: List[str] = list()
         seqs: List[str] = list()
         # my %handles; # file handles for n bins.
         if bin_num == 1:
@@ -456,17 +454,17 @@ def main(
                     gibbs_prefix=gibbs_prefix,
                     prestart=prestart,
                     width=width,
-                    build_cmd=build,
+                    build_cmd=build, #probuild --par par_1.default
                     hmm_cmd=hmm,
                     par=par,
                     maxitr=maxitr,
                     identity=identity,
                 )
-            list_of_temp.extend(new_tmp_files)
+                list_of_temp.extend(new_tmp_files)
             # combine individual models to make the final model file
             final_model = combineModel(models, cutoffs)
 
-        run(["cp", final_model, out_name])
+        run(f"cp {final_model} {out_name}".split())
         if out_name != final_model:
             list_of_temp.extend(final_model)
 
@@ -486,13 +484,13 @@ def main(
 
     if do_iterations:
         if motif:
-            run([hmm, "-r", "-m", out_name, "-o", output, format_gmhmmp, seqfile])
+            run(f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
         else:
             # no moitf option specified
-            run([hmm, "-m", out_name, "-o", output, format_gmhmmp, seqfile])
+            run(f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
     else:
         # no iterations - use heuristic only
-        run([hmm, "-m", meta_model, "-o", output, format_gmhmmp, seqfile])
+        run(f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}".split())
 
     # this seems stupid dangerous.
     # TODO: replace with using tempfile.TemporaryDirectory
@@ -503,26 +501,30 @@ def main(
 
 
 def train(
-    input_seq: str,
-    seq: str,
-    motif: bool,
-    fixmotif: bool,
-    order: int,
-    order_non: int,
-    start_prefix: str,
-    gibbs_prefix: str,
-    prestart: int,
-    width: int,
-    build_cmd: str,
-    hmm_cmd: str,
-    par: str,
-    maxitr: int,
-    identity: float,
-):
+    input_seq: str, # test.fa
+    seq: str, # sequence
+    motif: bool, # True
+    fixmotif: bool, # True
+    order: int, # 4
+    order_non: int, # 2
+    start_prefix: str, # "startseq."
+    gibbs_prefix: str, # "itr_"
+    prestart: int, # 6
+    width: int, # 12
+    build_cmd: str, # "probuild --par par_1.default"
+    hmm_cmd: str, # "gmhmmp -s -d"
+    par: str, # "par_1.default"
+    maxitr: int, # 10
+    identity: float, # 0.99
+) -> Tuple[str, List[str]]:
     tmp_files: List[str] = list()
     # ------------------------------------------------
     # prepare sequence
-    run([build_cmd, "--clean_join", seq, "--seq", input_seq])
+    # build_cmd should have the form of! `probuild --par par_1.default`
+    # so this makes the below
+    # `probuild --par par_1.default --clean_join sequence --seq test.fa`
+    # which seems kind of redundant, but what do I know
+    run(f"{build_cmd} --clean_join {seq} --seq {input_seq}".split())
     # TODO: another thing to restore when we figure out logging.
     # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile])
 
@@ -533,7 +535,7 @@ def train(
     with open(seq, "r") as _:
         sequence_size = len(_.read())
 
-    min_size_find_cmd = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
+    min_size_find_cmd = run(args=[f"grep MIN_SEQ_SIZE {par}".split()], capture_output=True)
     minimum_sequence_size = re.findall(
         pattern="\s*--MIN_SEQ_SIZE\s+", string=str(min_size_find_cmd.stdout, "utf=8")
     )[0]
@@ -541,18 +543,8 @@ def train(
     do_iterations = True
 
     if sequence_size < minimum_sequence_size:
-        run(
-            [
-                build_cmd,
-                "--clean_join",
-                seq,
-                "--seq",
-                input_seq,
-                "--MIN_CONTIG_SIZE",
-                0,
-                "--GAP_FILLER",
-            ]
-        )
+        # form of! `probuild --par par_1.default --clean_join sequence --seq test.fa --MIN_CONTIG_SIZE 0 --GAP_FILLER
+        run(f"{build_cmd} --clean_join {seq} --seq {input_seq} --MIN_CONTIG_SIZE 0 --GAP_FILLER".split())
         # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile, "--MIN_CONTIG_SIZE", 0, "--GAP_FILLER"])
         do_iterations = False
 
@@ -563,7 +555,9 @@ def train(
     itr = 0
     next_item = f"{hmmout_prefix}{itr}{hmmout_suffix}"
     print("run initial prediction")
-    run([hmm_cmd, seq, "-m", meta_model, "-o", next_item])
+
+    # form of! `gmhmmp -s -d sequence -m MetaGeneMark_v1.mod -o itr_{itr}.lst`
+    run(f"{hmm_cmd} {seq} -m {meta_model} -o {next_item}".split())
     # TODO: tempfile
     tmp_files.extend((next_item))
 
@@ -586,10 +580,12 @@ def train(
         if motif and not fixmotif:
             command = f"{command} --pre_start {start_seq} --PRE_START_WIDTH {prestart}"
         elif motif and fixmotif:
-            command = f"{command} --fixmotif --PRE_START_WIDTH {prestart} --width {width}"
+            command = (
+                f"{command} --fixmotif --PRE_START_WIDTH {prestart} --width {width}"
+            )
             # command += f" --fixmotif --PRE_START_WIDTH {prestart} --width {width} --log {logfile}"
 
-        print(f"build model: $mod for iteration: {itr}")
+        print(f"build model: {mod} for iteration: {itr}")
         run(command.split())
         tmp_files.extend((mod))
 
@@ -601,39 +597,25 @@ def train(
             # elif $gibbs_version == 3:
             #     &RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" )
             print("run gibbs3 sampler")
-            run(
-                [
-                    gibbs3,
-                    start_seq,
-                    width,
-                    "-o",
-                    gibbs_out,
-                    "-F",
-                    "-Z",
-                    "-n",
-                    "-r",
-                    "-y",
-                    "-x",
-                    "-m",
-                    "-s",
-                    "1",
-                    "-w",
-                    "0.01",
-                ]
-            )
-
+            # form of! 'Gibbs3 startseq.{itr} 12 -o gibbs_out.{itr} -F -Z -n -r -y -x -m -s 1 -w 0.01"
+            run(f"{gibbs3} {start_seq} {width} -o {gibbs_out} -F -Z -n -r -y -x -m -s 1 -w 0.01".split())
             tmp_files.extend((start_seq))
 
             print("make prestart model")
             # TODO: logfile
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
-            run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq])
+            # form of! `probuild --par par_1.default --gibs gibbs_out.{itr} --mod itr_{itr}.mod --seq startseq.{itr}
+            run(f"{build_cmd} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}".split())
             tmp_files.extend((gibbs_out))
 
         prev = next_item
+        # next_item = itr_{itr}.lst
         next_item = f"{hmmout_prefix}{itr}{hmmout_suffix}"
 
+        # form of! `gmhmmp -s d sequence -m itr_{itr}.mod -o itr_{itr}.lst
         command = f"{hmm_cmd} {seq} -m {mod} -o {next_item}"
+
+        # form of! `gmhmmp -s d sequence -m itr_{itr}.mod -o itr_{itr}.lst -r
         if motif:
             command += " -r"
 
@@ -641,10 +623,11 @@ def train(
         run(command.split())
         tmp_files.extend((next_item))
 
+        # `probuild --par par_1.default --compare --source itr_{itr}.lst --target itr_{itr-1}.lst
         command = f"{build_cmd} --compare --source {next_item} --target {prev}"
         # &Log( "compare:\n" . $command . "\n" );
 
-        diff = run(command.split(), capture_output=True).strip()
+        diff = str(run(command.split(), capture_output=True).stdout).strip()
         # &Log( "compare $prev and $next_item: $diff\n" );
 
         if diff >= identity:
@@ -656,7 +639,9 @@ def train(
     return mod, tmp_files
 
 
-def cluster(feature_f: str, clusters: int, min_length: int = 10000):  # $gc_out, $bins
+def cluster(
+    feature_f: str, clusters: int, min_length: int = 10000
+) -> Tuple[int, List[int, int], Dict(str, int)]:  # $gc_out, $bins
     gc_hash: Dict[int, int] = dict()
     cut_off_points = list()
     num_of_seq = 0
@@ -747,7 +732,7 @@ def cluster(feature_f: str, clusters: int, min_length: int = 10000):  # $gc_out,
 # -----------------------------------------------
 
 
-def combineModel(mod: int, cut_offs: List[int], minGC: int, maxGC: int):
+def combineModel(mod: List[str], cut_offs: List[int], minGC: int = 30, maxGC: int = 70):
     # change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
     cut_offs[0] = minGC
     cut_offs[-1] = maxGC
