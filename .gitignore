@@ -148,3 +148,4 @@ pygmst/par_*
 pygmst/gmhmmp
 pygmst/GeneMark_hmm.mod
 pygmst/sequence
+.DS_Store
