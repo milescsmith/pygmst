@@ -12,6 +12,7 @@ import pyfaidx
 from Bio.SeqUtils import GC as getGC
 from sortedcontainers import SortedDict
 import tempfile
+from pkgutil import get_data
 
 BINS = "1|2|3|0"
 SHAPE_TYPE = "linear|circular|partial"
@@ -35,7 +36,8 @@ global hmmout_prefix
 global hmmout_suffix
 global out_name
 global fnn_out
-global faa_out 
+global faa_out
+global working_path
 
 global meta_out
 global gc_out
@@ -254,9 +256,9 @@ def main(
 
     current_module = __import__(__name__)
     if current_module.__name__ != "__main__":
-        working_path = current_module.__path__[0]
+        working_path = os.path.dirname(sys.modules['pygmst'].__file__)
     else:
-        working_path = os.getcwd()
+        working_path = f"{os.getcwd()}/pygmst"
 
     if output is None:
         base = os.path.basename(input)
@@ -285,7 +287,7 @@ def main(
         prestart = 40
         width = 6
     if par is None:
-        par = f"{working_path}/pygmst/models/par_{gcode}.default"
+        par = f"{working_path}/genemark/par_{gcode}.default"
     if version:
         print(f"{__version__}")
     if verbose:
@@ -293,167 +295,96 @@ def main(
         # log = logging.basicConfig(filename='gmst.log', level=logging.INFO)
         pass
     
-   
+    with tempfile.TemporaryDirectory() as tmpdir:
 
-    # GeneMark.hmm gene finding program <gmhmmp>; version 2.14
-    hmm = f"{working_path}/pygmst/utilities/gmhmmp"
+        # GeneMark.hmm gene finding program <gmhmmp>; version 2.14
+        hmm = f"{working_path}/genemark/gmhmmp"
 
-    # sequence parsing tool <probuild>; version 2.11c
-    build = f"{working_path}/pygmst/utilities/probuild"
+        # sequence parsing tool <probuild>; version 2.11c
+        build = f"{working_path}/genemark/probuild"
 
-    # gibbs sampler - from http://bayesweb.wadsworth.org/gibbs/gibbs.html ; version 3.10.001  Aug 12 2009
-    # this doesn't appear to be available from that source?
-    # possible replacement at https://github.com/Etschbeijer/GibbsSampler ?
-    gibbs3 = f"{working_path}/pygmst/utilities/Gibbs3"
+        # gibbs sampler - from http://bayesweb.wadsworth.org/gibbs/gibbs.html ; version 3.10.001  Aug 12 2009
+        # this doesn't appear to be available from that source?
+        # possible replacement at https://github.com/Etschbeijer/GibbsSampler ?
+        gibbs3 = f"{working_path}/genemark/Gibbs3"
 
-    # use <probuild> with GeneMarkS parameter file <$par>
-    build = f"{build} --par {par}"
+        # use <probuild> with GeneMarkS parameter file <$par>
+        build = f"{build} --par {par}"
 
-    # set options for <gmhmmp>
+        # set options for <gmhmmp>
 
-    # switch gene overlap off in GeneMark.hmm; for eukaryotic intron-less genomes
-    if offover:
-        hmm = f"{hmm} -p 0"
+        # switch gene overlap off in GeneMark.hmm; for eukaryotic intron-less genomes
+        if offover:
+            hmm = f"{hmm} -p 0"
 
-    # set strand to predict
-    if strand == "direct":
-        hmm = f"{hmm} -s d "
-    elif strand == "reverse":
-        hmm = f"{hmm} -s r "
+        # set strand to predict
+        if strand == "direct":
+            hmm = f"{hmm} -s d "
+        elif strand == "reverse":
+            hmm = f"{hmm} -s r "
 
-    list_of_temp: List[str] = list()
-    GC = 0
-
-    # ------------------------------------------------
-    ## tmp solution: get sequence size, get minimum sequence size from --par <file>
-    ## compare, skip iterations if short
-
-    # run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile}")
-
-    # this should end up as something like
-    # 'probuild --par par_1.default --clean_join sequence --seq test.fa
-    run(f"{build} --clean_join {seq} --seq {seqfile}".split())
-    list_of_temp.extend((seqfile))
-
-    with open(seqfile, "r") as _:
-        sequence_size = len(_.read())
-
-    command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
-    minimum_sequence_size = int(re.findall(
-        pattern="\s*--MIN_SEQ_SIZE\s+(\d+)", string=str(command.stdout, "utf=8")
-    )[0])
-
-    do_iterations = 1
-
-    if sequence_size < minimum_sequence_size:
-        do_iterations = 0
-
-    if do_iterations > 0:
-        # ------------------------------------------------
-        # clustering
-
-        # initial prediction using MetaGeneMark model
-        list_of_temp.extend((meta_out, f"{meta_out}.fna"))
-
-        # get GC of whole sequence for each sequence"
-        # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
-        gc_out = tempfile.NamedTemporaryFile()
-
-        run(args=f"{build} --stat_fasta --seq {seqfile} > {gc_out}".split())
-        list_of_temp.extend((gc_out))
-
-        # determine bin number and range
-        bin_num, cutoffs, seq_GC = cluster(
-            feature_f=gc_out, clusters=bins, min_length=MIN_LENGTH
-        )
-        # Log("bin number = $bin_num\n");
-        # Log( "GC range = ".join(",",@$cutoffs)."\n" );
+        list_of_temp: List[str] = list()
+        GC = 0
 
         # ------------------------------------------------
-        # training
+        ## tmp solution: get sequence size, get minimum sequence size from --par <file>
+        ## compare, skip iterations if short
 
-        # my $final_model;
-        # my @seqs;
-        models: List[str] = list()
-        seqs: List[str] = list()
-        # my %handles; # file handles for n bins.
-        if bin_num == 1:
-            final_model, new_tmp_files = train(
-                input_seq=seqfile,
-                seq=seq,
-                motif=motif,
-                fixmotif=fixmotif,
-                order=order,
-                order_non=order_non,
-                start_prefix=start_prefix,
-                gibbs_prefix=gibbs_prefix,
-                prestart=prestart,
-                width=width,
-                build_cmd=build,
-                hmm_cmd=hmm,
-                par=par,
-                maxitr=maxitr,
-                identity=identity,
-                gibbs3=gibbs3,
+        # run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile}")
+
+        # this should end up as something like
+        # 'probuild --par par_1.default --clean_join sequence --seq test.fa
+        run(f"{build} --clean_join {seq} --seq {seqfile}".split())
+        # list_of_temp.extend([seqfile])
+
+        with open(seqfile, "r") as _:
+            sequence_size = len(_.read())
+
+        command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
+        minimum_sequence_size = int(re.findall(
+            pattern="\s*--MIN_SEQ_SIZE\s+(\d+)", string=str(command.stdout, "utf=8")
+        )[0])
+
+        do_iterations = 1
+
+        if sequence_size < minimum_sequence_size:
+            do_iterations = 0
+
+        if do_iterations > 0:
+            # ------------------------------------------------
+            # clustering
+
+            # initial prediction using MetaGeneMark model
+            list_of_temp.extend([meta_out, f"{meta_out}.fna"])
+
+            # get GC of whole sequence for each sequence"
+            gc_out = f'{tmpdir}/initial.meta.list.feature'
+
+            # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
+            gc_cmd = f"{build} --stat_fasta --seq {seqfile}"
+            with open(gc_out, 'w') as gc_capture:
+                gc_capture.write(str(run(gc_cmd.split(), capture_output=True).stdout, 'utf-8'))
+            
+            list_of_temp.extend([gc_out])
+
+            # determine bin number and range
+            bin_num, cutoffs, seq_GC = cluster(
+                feature_f=gc_out, clusters=bins, min_length=MIN_LENGTH
             )
-            list_of_temp.extend(new_tmp_files)
-            # -----------------------------
-            # make a GC file for the input file
-            # open NEWINPUT, ">", $newseq;
-            # -----------------------------
-            # read input sequences
-            try:
-                FA = pyfaidx.Fasta(seqfile)
-                seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
-                for read in FA:
-                    if read.long_name not in seq_GC_entries:
-                        seq_GC[f">{read.long_name}"] = int(getGC(read[:].seq))
-            except:
-                print(f"Cannot open {seqfile}")
-                # print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
+            # Log("bin number = $bin_num\n");
+            # Log( "GC range = ".join(",",@$cutoffs)."\n" );
 
-        else:
-            # create sequence file for each bin
-            handles = SortedDict()
-            for i in range(start=1, stop=bin_num + 1):
-                with open(file=f"seq_bin_{i}", mode="w") as fh:
-                    seqs.extend((f"seq_bin_{i}"))
-                    handles[i] = fh
+            # ------------------------------------------------
+            # training
 
-            # read input sequences
-            try:
-                FA = pyfaidx.Fasta(seqfile)
-                seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
-                for read in FA:
-                    if read.long_name not in seq_GC_entries:
-                        read_header = f">{read.long_name}"
-                        seq_GC[read_header] = int(getGC(read[:].seq))
-
-                    # decide which bin the sequence belongs to
-                    if bin_num == 2:
-                        if seq_GC[read_header] <= cutoffs[0]:
-                            bin = 1
-                        else:
-                            bin = 2
-                    else:
-                        if seq_GC[read_header] <= cutoffs[0]:
-                            bin = 1
-                        elif seq_GC[read_header] <= cutoffs[1]:
-                            bin = 2
-                        else:
-                            bin = 3
-
-                    # output to corresponding output bin file
-                    with open(file=handles[bin], mode="w") as fh:
-                        fh.writelines(
-                            f"{read_header}\t[gc={seq_GC[read_header]}\n{read[:].seq}\n"
-                        )
-            except:
-                print(f"Cannot open {seqfile}")
-            # train
-            for i in range(stop=bin_num):
-                models[i], new_tmp_files = train(
-                    input_seq=seqs[i],
+            # my $final_model;
+            # my @seqs;
+            models: List[str] = list()
+            seqs: List[str] = list()
+            # my %handles; # file handles for n bins.
+            if bin_num == 1:
+                final_model, new_tmp_files = train(
+                    input_seq=seqfile,
                     seq=seq,
                     motif=motif,
                     fixmotif=fixmotif,
@@ -463,52 +394,130 @@ def main(
                     gibbs_prefix=gibbs_prefix,
                     prestart=prestart,
                     width=width,
-                    build_cmd=build, #probuild --par par_1.default
+                    build_cmd=build,
                     hmm_cmd=hmm,
                     par=par,
                     maxitr=maxitr,
                     identity=identity,
                     gibbs3=gibbs3,
+                    workpath=working_path,
                 )
                 list_of_temp.extend(new_tmp_files)
-            # combine individual models to make the final model file
-            final_model = combineModel(models, cutoffs)
+                # -----------------------------
+                # make a GC file for the input file
+                # open NEWINPUT, ">", $newseq;
+                # -----------------------------
+                # read input sequences
+                try:
+                    FA = pyfaidx.Fasta(seqfile)
+                    seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
+                    for read in FA:
+                        if read.long_name not in seq_GC_entries:
+                            seq_GC[f">{read.long_name}"] = int(getGC(read[:].seq))
+                except:
+                    print(f"Cannot open {seqfile}")
+                    # print NEWINPUT ">$read{header}\t[gc=$seq_GC->{$read{header}}]\n$read{seq}\n";
 
-        run(f"cp {final_model} {out_name}".split())
-        if out_name != final_model:
-            list_of_temp.extend(final_model)
+            else:
+                # create sequence file for each bin
+                handles = SortedDict()
+                for i in range(start=1, stop=bin_num + 1):
+                    with open(file=f"seq_bin_{i}", mode="w") as fh:
+                        seqs.extend([f"seq_bin_{i}"])
+                        handles[i] = fh
 
-    if outputformat is "GFF":
-        format_gmhmmp = " -f G "
+                # read input sequences
+                try:
+                    FA = pyfaidx.Fasta(seqfile)
+                    seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
+                    for read in FA:
+                        if read.long_name not in seq_GC_entries:
+                            read_header = f">{read.long_name}"
+                            seq_GC[read_header] = int(getGC(read[:].seq))
 
-    if filterseq is 1:
-        hmm += " -b "
-    if faa:
-        hmm += f" -A {faa_out} "
-    if fnn:
-        hmm += f" -D {fnn_out} "
-    # $hmm .= " -a $faa_out " if $faa;
-    # $hmm .= " -d $fnn_out " if $fnn;
+                        # decide which bin the sequence belongs to
+                        if bin_num == 2:
+                            if seq_GC[read_header] <= cutoffs[0]:
+                                bin = 1
+                            else:
+                                bin = 2
+                        else:
+                            if seq_GC[read_header] <= cutoffs[0]:
+                                bin = 1
+                            elif seq_GC[read_header] <= cutoffs[1]:
+                                bin = 2
+                            else:
+                                bin = 3
 
-    list_of_temp.extend(("with_seq.out"))
+                        # output to corresponding output bin file
+                        with open(file=handles[bin], mode="w") as fh:
+                            fh.writelines(
+                                f"{read_header}\t[gc={seq_GC[read_header]}\n{read[:].seq}\n"
+                            )
+                except:
+                    print(f"Cannot open {seqfile}")
+                # train
+                for i in range(stop=bin_num):
+                    models[i], new_tmp_files = train(
+                        input_seq=seqs[i],
+                        seq=seq,
+                        motif=motif,
+                        fixmotif=fixmotif,
+                        order=order,
+                        order_non=order_non,
+                        start_prefix=start_prefix,
+                        gibbs_prefix=gibbs_prefix,
+                        prestart=prestart,
+                        width=width,
+                        build_cmd=build, #probuild --par par_1.default
+                        hmm_cmd=hmm,
+                        par=par,
+                        maxitr=maxitr,
+                        identity=identity,
+                        gibbs3=gibbs3,
+                        workpath=working_path
+                    )
+                    list_of_temp.extend(new_tmp_files)
+                # combine individual models to make the final model file
+                final_model = combineModel(models, cutoffs)
 
-    if do_iterations:
-        if motif:
-            run(f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
+            run(f"cp {final_model} {out_name}".split())
+            if out_name != final_model:
+                list_of_temp.extend([final_model])
+
+        if outputformat is "GFF":
+            format_gmhmmp = " -f G "
         else:
-            # no moitf option specified
-            run(f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
-    else:
-        meta_model = f"{current_module.__path__[0]}/models/MetaGeneMark_v1.mod"
-        # no iterations - use heuristic only
-        run(f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}".split())
+            format_gmhmmp = ""
 
-    # this seems stupid dangerous.
-    # TODO: replace with using tempfile.TemporaryDirectory
-    if clean:
-        for _ in list_of_temp:
-            run(["rm", "-f", _])
-    pass
+        if filterseq is 1:
+            hmm += " -b "
+        if faa:
+            hmm += f" -A {faa_out} "
+        if fnn:
+            hmm += f" -D {fnn_out} "
+        # $hmm .= " -a $faa_out " if $faa;
+        # $hmm .= " -d $fnn_out " if $fnn;
+
+        list_of_temp.extend(["with_seq.out"])
+
+        if do_iterations:
+            if motif:
+                run(f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
+            else:
+                # no moitf option specified
+                run(f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
+        else:
+            meta_model = f"{working_path}/genemark/MetaGeneMark_v1.mod"
+            # no iterations - use heuristic only
+            run(f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}".split())
+
+        # this seems stupid dangerous.
+        # TODO: replace with using tempfile.TemporaryDirectory
+        # if clean:
+        #     for _ in list_of_temp:
+        #         run(["rm", "-f", _])
+        print(f"wrote final results to {output}")
 
 
 def train(
@@ -528,6 +537,7 @@ def train(
     maxitr: int, # 10
     identity: float, # 0.99
     gibbs3: str,
+    workpath: str,
 ) -> Tuple[str, List[str]]:
     tmp_files: List[str] = list()
     # ------------------------------------------------
@@ -569,10 +579,8 @@ def train(
     print("run initial prediction")
 
     # form of! `gmhmmp -s d sequence -m MetaGeneMark_v1.mod -o itr_{itr}.lst`
-    print(f"{hmm_cmd} -m {os.path.abspath('../models/MetaGeneMark_v1.mod')} -o {next_item} {seq}")
-    run(f"{hmm_cmd} -m {os.path.abspath('../models/MetaGeneMark_v1.mod')} -o {next_item} {seq}".split())
-    # TODO: tempfile
-    print(f"Next item up for bid is: {next_item}")
+    run(f"{hmm_cmd} -m {workpath}/genemark/MetaGeneMark_v1.mod -o {next_item} {seq}".split())
+    # TODO: tempfile    
     tmp_files.extend([next_item])
 
     # ------------------------------------------------
@@ -601,7 +609,6 @@ def train(
 
         print(f"build model: {mod} for iteration: {itr}")
         run(command.split())
-        print(f"Next item up for bid is: {mod}")
         tmp_files.extend([mod])
 
         if (
@@ -614,16 +621,13 @@ def train(
             print("run gibbs3 sampler")
             # form of! 'Gibbs3 startseq.{itr} 12 -o gibbs_out.{itr} -F -Z -n -r -y -x -m -s 1 -w 0.01"
             run(f"{gibbs3} {start_seq} {width} -o {gibbs_out} -F -Z -n -r -y -x -m -s 1 -w 0.01".split())
-            print(f"Next item up for bid is: {start_seq}")
             tmp_files.extend([start_seq])
 
             print("make prestart model")
             # TODO: logfile
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
             # form of! `probuild --par par_1.default --gibs gibbs_out.{itr} --mod itr_{itr}.mod --seq startseq.{itr}
-            print(f"{build_cmd} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}")
             run(f"{build_cmd} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}".split())
-            print(f"Next item up for bid is: {gibbs_out}")
             tmp_files.extend([gibbs_out])
 
         prev = next_item
@@ -638,19 +642,15 @@ def train(
             command += " -r"
 
         print(f"prediction, iteration: {itr}")
-        print(command)
         run(command.split())
-        print(f"Next item up for bid is: {next_item}")
         tmp_files.extend([next_item])
-        print(tmp_files)
 
         # `probuild --par par_1.default --compare --source itr_{itr}.lst --target itr_{itr-1}.lst
         command = f"{build_cmd} --compare --source {next_item} --target {prev}"
-        print(command)
         # &Log( "compare:\n" . $command . "\n" );
 
         diff = str(run(command.split(), capture_output=True).stdout, 'utf-8').strip("\n")
-        print(diff)
+        print(f"iteration {itr}, difference: {diff}")
         # &Log( "compare $prev and $next_item: $diff\n" );
 
         if float(diff) >= identity:
@@ -673,26 +673,27 @@ def cluster(
 
     # with feature_f as GC:
         # read in probuild output, line by line.  Should be fasta input.
-    for line in feature_f:
-        # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
-        # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
-        text = re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
-        if text:
-            header = text.group(1)  # Reference name
-            length = int(text.group(2))  # length of sequence?
-            GC = int(text.group(3))  # must be GC percentage
-            header_re = re.search(
-                pattern="^(.*?)\t", string=line
-            )  # Dont get this one - didn't we already extract just this capture group?
-            if header_re:
-                header = header_re.group(1)
-            header_to_cod_GC[header] = GC
-            num_of_seq += 1
-            total_length += length
-            if GC in gc_hash:
-                gc_hash[GC] += length
-            else:
-                gc_hash[GC] = length
+    with open(feature_f, "r") as GC:
+        for line in GC:
+            # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
+            # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
+            text = re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)
+            if text:
+                header = text.group(1)  # Reference name
+                length = int(text.group(2))  # length of sequence?
+                GC = int(text.group(3))  # must be GC percentage
+                header_re = re.search(
+                    pattern="^(.*?)\t", string=line
+                )  # Dont get this one - didn't we already extract just this capture group?
+                if header_re:
+                    header = header_re.group(1)
+                header_to_cod_GC[header] = GC
+                num_of_seq += 1
+                total_length += length
+                if GC in gc_hash:
+                    gc_hash[GC] += length
+                else:
+                    gc_hash[GC] = length
 
     sorted_GC = SortedDict(gc_hash)  # sort the gc_hash dictionary by keys
     min_GC = sorted_GC.values()[0]
@@ -732,20 +733,20 @@ def cluster(
             clusters = 1
         else:
             if gc_hash[one_third] > min_length:
-                cut_off_points.extend((min_GC, one_third, two_third, max_GC))
+                cut_off_points.extend([min_GC, one_third, two_third, max_GC])
             else:
                 # &Log( "Total length of sequences is not enough for training in 3 clusters!\n" )
                 clusters = 2
 
     if clusters == 2:
         if gc_hash[one_half] > min_length:
-            cut_off_points.extend((min_GC, one_half, max_GC))
+            cut_off_points.extend([min_GC, one_half, max_GC])
         else:
             # &Log( "Total length of sequences is not enough for training in 2 clusters!\n" )
             pass
 
     if clusters == 1:
-        cut_off_points.extend((min_GC, max_GC))
+        cut_off_points.extend([min_GC, max_GC])
     return clusters, cut_off_points, header_to_cod_GC
 
 
