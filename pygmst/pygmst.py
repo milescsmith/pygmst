@@ -517,6 +517,12 @@ def main(
         # if clean:
         #     for _ in list_of_temp:
         #         run(["rm", "-f", _])
+        # Final list was:
+        # ['initial.meta.lst', 'initial.meta.lst.fna',
+        #  '/tmp/tmpv1seq_gr/initial.meta.list.feature',
+        #  'itr_0.lst', 'itr_1.mod', 'itr_1.lst', 'itr_2.mod',
+        #  'itr_2.lst', 'itr_3.mod', 'itr_3.lst', 'itr_3.mod',
+        #  'with_seq.out']
         print(f"wrote final results to {output}")
 
 
