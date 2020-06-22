@@ -7,14 +7,14 @@ from pathlib import Path
 from setuptools import setup, find_packages
 
 try:
-    from pygmst import __author__, __email__
+    from pygmst import __author__, __email__, __version__
 except ImportError:  # Deps not yet installed
     __author__ = "Miles Smith"
     __email__ = "miles-smith@omrf.org"
 
 setup(
     name="pygmst",
-    version="0.1.0",
+    version=__version__,
     description="Python reimplementation of GMST: Identification of protein coding regions in RNA transcripts",
     long_description=Path("README.rst").read_text("utf-8"),
     url="https://github.com/milescsmith/pygmst",
