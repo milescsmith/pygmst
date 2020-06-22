@@ -1,11 +1,17 @@
+include *.in
 include *.md
+include *.mod
 include *.txt
+include sequence
+recursive-include pygmst *.DS_Store
 recursive-include pygmst *.default
 recursive-include pygmst *.fa
+recursive-include pygmst *.fai
+recursive-include pygmst *.feature
+recursive-include pygmst *.ipynb
+recursive-include pygmst *.json
+recursive-include pygmst *.lst
 recursive-include pygmst *.mod
 recursive-include pygmst *.pl
 recursive-include pygmst *.py
 recursive-include pygmst *.tbl
-recursive-include pygmst utilities Gibbs3
-recursive-include pygmst utilities gmhmmp
-recursive-include pygmst utilities probuild

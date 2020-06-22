@@ -11,25 +11,23 @@ FROM mcr.microsoft.com/vscode/devcontainers/python:0-${VARIANT}
 
 # [Optional] If your requirements rarely change, uncomment this section to add them to the image.
 #
-COPY requirements.txt /tmp/pip-tmp/
-RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
-    && rm -rf /tmp/pip-tmp
+# COPY requirements.txt /tmp/pip-tmp/
+# RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
+#    && rm -rf /tmp/pip-tmp
 
 # [Optional] Uncomment this section to install additional packages.
 #
+# RUN apt-get update \
+#     && export DEBIAN_FRONTEND=noninteractive \
+#    && apt-get -y install --no-install-recommends <your-package-list-here>
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update --fix-missing && \
-    apt-get install --no-install-recommends -y \
+   apt-get install --no-install-recommends -y \
       curl \
-      gcc \
       git-core \
       python-dev \
       ssh \
-      vim \
-      wget && \
+      vim && \
    apt-get clean && \
    rm -rf /tmp/downloaded_packages/* && \
    rm -rf /var/lib/apt/lists/*
-
-RUN ln -s /opt/workspace/ssh /root/.ssh
-RUN ln -s /opt/gitconfig /root/.gitconfig

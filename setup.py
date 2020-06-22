@@ -7,14 +7,14 @@ from pathlib import Path
 from setuptools import setup, find_packages
 
 try:
-    from pygmst import __author__, __email__
+    from pygmst import __author__, __email__, __version__
 except ImportError:  # Deps not yet installed
     __author__ = "Miles Smith"
     __email__ = "miles-smith@omrf.org"
 
 setup(
     name="pygmst",
-    version="0.1.0",
+    version=__version__,
     description="Python reimplementation of GMST: Identification of protein coding regions in RNA transcripts",
     long_description=Path("README.rst").read_text("utf-8"),
     url="https://github.com/milescsmith/pygmst",
@@ -39,8 +39,10 @@ setup(
     ],
     # extras_require=dict(doc=["sphinx", "sphinx_rtd_theme", "sphinx_autodoc_typehints"]),
     include_package_data=True,
-    entry_points={"console_scripts": ["gmst = gmst.gmst:main"]},
+    entry_points={"console_scripts": ["pygmst = pygmst.pygmst:main"]},
     packages=find_packages(),
-    package_dir={"gmst": "gmst"},
-    package_data={"": ["gmst/models/*.*", "gmst/utilities/*.*"]},
+    package_dir={"pygmst": "pygmst"},
+    package_data={"": ["testfiles/*.*", "genemark/*.*", "tests/*.*"]},
+    # test_suite='nose2.collector',
+    # tests_require=['nose2'],
 )

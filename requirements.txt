@@ -3,3 +3,6 @@ click-option-group>=0.5.1
 pyfaidx>=0.5.8
 sortedcontainers>=2.2.2
 biopython>=1.76
+pre-commit>=2.5.1
+tox>=3.15.2
+pytest>=5.4.3
