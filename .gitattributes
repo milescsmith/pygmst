@@ -1,0 +1,4 @@
+pygmst/genemark/* linguist-vendored
+pygmst/testfiles/* linguist-vendored
+pygmst/tests/initial.meta.list.feature -linguist-vendored
+*.ipynb linguist-language=python

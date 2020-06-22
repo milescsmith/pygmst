@@ -15,15 +15,6 @@ import tempfile
 from pkgutil import get_data
 from pkg_resources import resource_filename
 
-BINS = "1|2|3|0"
-SHAPE_TYPE = "linear|circular|partial"
-GENETIC_CODE = "11|4|1"
-STRAND = "direct|reverse|both"
-MIN_HEURISTIC_GC = 30
-MAX_HEURISTIC_GC = 70
-OUTPUT_FORMAT = "LST|GFF"
-MIN_LENGTH = 10000
-
 # MetaGeneMark model for initial prediction
 # ------------------------------------------------
 
@@ -101,9 +92,9 @@ verbose = False
 @optgroup.group("Run options")
 @optgroup.option(
     "--bins",
-    type=click.Choice(["0", "1", "2", "3"]),
+    type=click.IntRange(1, 4, clamp=True),
     help="number of clusters for inhomogeneous genome. Use 0 for automatic clustering",
-    default="0",
+    default=0,
     show_default=True,
 )
 @optgroup.option(
@@ -144,6 +135,7 @@ verbose = False
 )
 @optgroup.option(
     "--motif",
+    "motifopt",
     type=click.Choice(["0", "1"]),
     help="iterative search for a sequence motif associated with CDS start",
     show_default=True,
@@ -228,14 +220,14 @@ def main(
     fnn: bool = False,
     faa: bool = False,
     clean: bool = True,
-    bins: str = "0",
+    bins: int = 0,
     prok: bool = False,
     filterseq: int = 1,
     strand: str = "both",
     order: int = 4,
     order_non: int = 2,
     gcode: str = "1",
-    motif: str = "1",
+    motifopt: str = "1",
     width: int = 12,
     prestart: int = 6,
     fixmotif: int = 1,
@@ -248,13 +240,11 @@ def main(
     verbose: bool = False,
     version: bool = False,
 ) -> None:
-    bins = int(bins)
-    motif = bool(motif)  # for compatibility
-    fixmotif = bool(fixmotif)  # for compatibility
+    motif = True if motifopt == "1" else False  # for compatibility
+    fixmotif = True if fixmotif == 1 else False  # for compatibility
 
-     # Not entirely sure this is the best way to include these in the module
+    # Not entirely sure this is the best way to include these in the module
     # but I am ignorant of how else to do so
-
     current_module = __import__(__name__)
     if current_module.__name__ != "__main__":
         working_path = os.path.dirname(sys.modules['pygmst'].__file__)
@@ -370,7 +360,7 @@ def main(
 
             # determine bin number and range
             bin_num, cutoffs, seq_GC = cluster(
-                feature_f=gc_out, clusters=bins, min_length=MIN_LENGTH
+                feature_f=gc_out, clusters=bins, min_length=10000
             )
             # Log("bin number = $bin_num\n");
             # Log( "GC range = ".join(",",@$cutoffs)."\n" );
@@ -688,19 +678,19 @@ def cluster(
             if text:
                 header = text.group(1)  # Reference name
                 length = int(text.group(2))  # length of sequence?
-                GC = int(text.group(3))  # must be GC percentage
+                seqGC = int(text.group(3))  # must be GC percentage
                 header_re = re.search(
                     pattern="^(.*?)\t", string=line
                 )  # Dont get this one - didn't we already extract just this capture group?
                 if header_re:
                     header = header_re.group(1)
-                header_to_cod_GC[header] = GC
+                header_to_cod_GC[header] = seqGC
                 num_of_seq += 1
                 total_length += length
-                if GC in gc_hash:
-                    gc_hash[GC] += length
+                if seqGC in gc_hash:
+                    gc_hash[seqGC] += length
                 else:
-                    gc_hash[GC] = length
+                    gc_hash[seqGC] = length
 
     sorted_GC = SortedDict(gc_hash)  # sort the gc_hash dictionary by keys
     min_GC = sorted_GC.values()[0]
