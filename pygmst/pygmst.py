@@ -13,6 +13,7 @@ from Bio.SeqUtils import GC as getGC
 from sortedcontainers import SortedDict
 import tempfile
 from pkgutil import get_data
+from pkg_resources import resource_filename
 
 BINS = "1|2|3|0"
 SHAPE_TYPE = "linear|circular|partial"
@@ -309,7 +310,7 @@ def main(
         gibbs3 = f"{working_path}/genemark/Gibbs3"
 
         # use <probuild> with GeneMarkS parameter file <$par>
-        build = f"{build} --par {par}"
+        build = f"{build} --par"
 
         # set options for <gmhmmp>
 
@@ -334,7 +335,7 @@ def main(
 
         # this should end up as something like
         # 'probuild --par par_1.default --clean_join sequence --seq test.fa
-        run(f"{build} --clean_join {seq} --seq {seqfile}".split())
+        run(f"{build} {par} --clean_join {seq} --seq {seqfile}".split())
         # list_of_temp.extend([seqfile])
 
         with open(seqfile, "r") as _:
@@ -361,7 +362,7 @@ def main(
             gc_out = f'{tmpdir}/initial.meta.list.feature'
 
             # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
-            gc_cmd = f"{build} --stat_fasta --seq {seqfile}"
+            gc_cmd = f"{build} {par} --stat_fasta --seq {seqfile}"
             with open(gc_out, 'w') as gc_capture:
                 gc_capture.write(str(run(gc_cmd.split(), capture_output=True).stdout, 'utf-8'))
             
@@ -483,14 +484,14 @@ def main(
 
             run(f"cp {final_model} {out_name}".split())
             if out_name != final_model:
-                list_of_temp.extend([final_model])
+                list_of_temp.extend([final_model])  
 
-        if outputformat is "GFF":
+        if outputformat == "GFF":
             format_gmhmmp = " -f G "
         else:
             format_gmhmmp = ""
 
-        if filterseq is 1:
+        if filterseq == 1:
             hmm += " -b "
         if faa:
             hmm += f" -A {faa_out} "
@@ -508,7 +509,7 @@ def main(
                 # no moitf option specified
                 run(f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}".split())
         else:
-            meta_model = f"{working_path}/genemark/MetaGeneMark_v1.mod"
+            meta_model = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
             # no iterations - use heuristic only
             run(f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}".split())
 
@@ -537,7 +538,7 @@ def train(
     gibbs_prefix: str, # "itr_"
     prestart: int, # 6
     width: int, # 12
-    build_cmd: str, # "probuild --par par_1.default"
+    build_cmd: str, # "probuild --par"
     hmm_cmd: str, # "gmhmmp -s d"
     par: str, # "par_1.default"
     maxitr: int, # 10
@@ -552,7 +553,7 @@ def train(
     # so this makes the below
     # `probuild --par par_1.default --clean_join sequence --seq test.fa`
     # which seems kind of redundant, but what do I know
-    run(f"{build_cmd} --clean_join {seq} --seq {input_seq}".split())
+    run(f"{build_cmd} {par} --clean_join {seq} --seq {input_seq}".split())
     # TODO: another thing to restore when we figure out logging.
     # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile])
 
@@ -572,7 +573,7 @@ def train(
 
     if sequence_size < minimum_sequence_size:
         # form of! `probuild --par par_1.default --clean_join sequence --seq test.fa --MIN_CONTIG_SIZE 0 --GAP_FILLER
-        run(f"{build_cmd} --clean_join {seq} --seq {input_seq} --MIN_CONTIG_SIZE 0 --GAP_FILLER".split())
+        run(f"{build_cmd} {par} --clean_join {seq} --seq {input_seq} --MIN_CONTIG_SIZE 0 --GAP_FILLER".split())
         # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile, "--MIN_CONTIG_SIZE", 0, "--GAP_FILLER"])
         do_iterations = False
 
@@ -585,7 +586,7 @@ def train(
     print("run initial prediction")
 
     # form of! `gmhmmp -s d sequence -m MetaGeneMark_v1.mod -o itr_{itr}.lst`
-    run(f"{hmm_cmd} -m {workpath}/genemark/MetaGeneMark_v1.mod -o {next_item} {seq}".split())
+    run(f"{hmm_cmd} -m {resource_filename('pygmst', 'genemark/MetaGeneMark_v1.mod')} -o {next_item} {seq}".split())
     # TODO: tempfile    
     tmp_files.extend([next_item])
 
@@ -603,7 +604,7 @@ def train(
             start_seq = f"{start_prefix}{itr}"
             gibbs_out = f"{gibbs_prefix}{itr}"
 
-        command = f"{build_cmd} --mkmod {mod} --seq {seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
+        command = f"{build_cmd} {par} --mkmod {mod} --seq {seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
 
         if motif and not fixmotif:
             command = f"{command} --pre_start {start_seq} --PRE_START_WIDTH {prestart}"
@@ -633,7 +634,7 @@ def train(
             # TODO: logfile
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
             # form of! `probuild --par par_1.default --gibs gibbs_out.{itr} --mod itr_{itr}.mod --seq startseq.{itr}
-            run(f"{build_cmd} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}".split())
+            run(f"{build_cmd} {par} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}".split())
             tmp_files.extend([gibbs_out])
 
         prev = next_item
@@ -652,7 +653,7 @@ def train(
         tmp_files.extend([next_item])
 
         # `probuild --par par_1.default --compare --source itr_{itr}.lst --target itr_{itr-1}.lst
-        command = f"{build_cmd} --compare --source {next_item} --target {prev}"
+        command = f"{build_cmd} {par} --compare --source {next_item} --target {prev}"
         # &Log( "compare:\n" . $command . "\n" );
 
         diff = str(run(command.split(), capture_output=True).stdout, 'utf-8').strip("\n")

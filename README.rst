@@ -6,6 +6,9 @@
     :alt: Code style: black
     :target: https://github.com/python/black
 
+.. image:: https://www.codefactor.io/repository/github/milescsmith/pygmst/badge?s=088f5e010a0d94e51cce34fe1fdcab54adc16734
+   :target: https://www.codefactor.io/repository/github/milescsmith/pygmst
+   :alt: CodeFactor
 
 pygmst
 ======

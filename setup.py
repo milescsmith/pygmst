@@ -43,6 +43,6 @@ setup(
     packages=find_packages(),
     package_dir={"pygmst": "pygmst"},
     package_data={"": ["testfiles/*.*", "genemark/*.*", "tests/*.*"]},
-    test_suite='nose.collector',
-    tests_require=['nose'],
+    # test_suite='nose2.collector',
+    # tests_require=['nose2'],
 )

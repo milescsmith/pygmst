@@ -3,7 +3,7 @@ import pkgutil
 from pkg_resources import resource_filename
 from os.path import exists
 import json
-from . import pygmst
+from .. import pygmst
 
 
 class TestClusterFunction(unittest.TestCase):

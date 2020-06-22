@@ -148,3 +148,13 @@ pygmst/par_*
 pygmst/gmhmmp
 pygmst/GeneMark_hmm.mod
 pygmst/sequence
+.gitconfig
+itr_0.lst
+itr_1.lst
+itr_1.mod
+itr_2.lst
+itr_2.mod
+itr_3.lst
+itr_3.mod
+MANIFEST.in.bak
+pygmst/testfiles/.DS_Store
