@@ -13,7 +13,9 @@
 .. image:: https://coveralls.io/repos/github/milescsmith/pygmst/badge.svg?branch=master
    :target: https://coveralls.io/github/milescsmith/pygmst?branch=master
 
-
+.. image:: https://travis-ci.org/milescsmith/pygmst.svg?branch=master
+    :target: https://travis-ci.org/milescsmith/pygmst
+    
 pygmst
 ======
 

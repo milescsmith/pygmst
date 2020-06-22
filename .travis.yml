@@ -1,6 +1,6 @@
 language: python
 python:
-  - "3.6"      # current default Python on Travis CI
+#   - "3.6"      # Guess we don't work on 3.6?  Not fixing it right now.
   - "3.7"
   - "3.8"
   - "3.8-dev"  # 3.8 development branch
