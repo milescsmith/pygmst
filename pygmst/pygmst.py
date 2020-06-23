@@ -262,7 +262,7 @@ def main(
         par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
     if version:
         print(f"{__version__}")
-        pass
+        sys.exit()
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
@@ -527,8 +527,6 @@ def train(
 
     if os.path.getsize(input_seq) == 0:
         raise ValueError("the input sequence is empty")
-        logging.critical(f"the input sequence is empty")
-        return None
 
     command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq}"
     result = run(command.split(), stdout=PIPE, stderr=STDOUT)
