@@ -28,7 +28,7 @@ class TestTrainFunction(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             final_model = combineModel(
-                mod=[self.model_1, self.model_2], cut_offs=[30, 70]
+                mod=[self.model_1, self.model_2], cut_offs=[30, 70], tmpdir=tmpdir
             )
 
             with open(final_model, "r") as fm, open(

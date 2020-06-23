@@ -15,24 +15,6 @@ import tempfile
 from pkgutil import get_data
 from pkg_resources import resource_filename
 
-# MetaGeneMark model for initial prediction
-# ------------------------------------------------
-
-# TODO: redefine these as needed within the code
-# global seq
-# global start_prefix
-# global gibbs_prefix
-# global mod_prefix
-# global mod_suffix
-# global hmmout_prefix
-# global hmmout_suffix
-# global out_name
-# global fnn_out
-# global faa_out
-# global working_path
-
-# global meta_out
-# global gc_out
 
 seq = "sequence"
 start_prefix = "startseq."
@@ -250,14 +232,6 @@ def main(
     motif = True if motifopt == "1" else False  # for compatibility
     fixmotif = True if fixmotif == 1 else False  # for compatibility
 
-    # Not entirely sure this is the best way to include these in the module
-    # but I am ignorant of how else to do so
-    current_module = __import__(__name__)
-    if current_module.__name__ != "__main__":
-        working_path = os.path.dirname(sys.modules["pygmst"].__file__)
-    else:
-        working_path = f"{os.getcwd()}/pygmst"
-
     if output is None:
         base = os.path.basename(input)
         output = os.path.splitext(base)[0]
@@ -285,26 +259,24 @@ def main(
         prestart = 40
         width = 6
     if par is None:
-        par = f"{working_path}/genemark/par_{gcode}.default"
+        par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
     if version:
         print(f"{__version__}")
-    if verbose:
-        # TODO: add actual logging
-        # log = logging.basicConfig(filename='gmst.log', level=logging.INFO)
         pass
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
+        # out_name = f"{tmpdir}/{out_name}"
         # GeneMark.hmm gene finding program <gmhmmp>; version 2.14
-        hmm = f"{working_path}/genemark/gmhmmp"
+        hmm = resource_filename("pygmst", "genemark/gmhmmp")
 
         # sequence parsing tool <probuild>; version 2.11c
-        build = f"{working_path}/genemark/probuild"
+        build = resource_filename("pygmst", "genemark/probuild")
 
         # gibbs sampler - from http://bayesweb.wadsworth.org/gibbs/gibbs.html ; version 3.10.001  Aug 12 2009
         # this doesn't appear to be available from that source?
         # possible replacement at https://github.com/Etschbeijer/GibbsSampler ?
-        gibbs3 = f"{working_path}/genemark/Gibbs3"
+        gibbs3 = resource_filename("pygmst", "genemark/Gibbs3")
 
         # use <probuild> with GeneMarkS parameter file <$par>
         build = f"{build} --par"
@@ -321,19 +293,14 @@ def main(
         elif strand == "reverse":
             hmm = f"{hmm} -s r "
 
-        list_of_temp: List[str] = list()
         GC = 0
 
-        # ------------------------------------------------
         ## tmp solution: get sequence size, get minimum sequence size from --par <file>
         ## compare, skip iterations if short
-
-        # run(f"{build} --clean_join {seq} --seq {seqfile} --log {logfile}")
 
         # this should end up as something like
         # 'probuild --par par_1.default --clean_join sequence --seq test.fa
         run(f"{build} {par} --clean_join {seq} --seq {seqfile}".split())
-        # list_of_temp.extend([seqfile])
 
         with open(seqfile, "r") as _:
             sequence_size = len(_.read())
@@ -354,9 +321,7 @@ def main(
         if do_iterations > 0:
             # ------------------------------------------------
             # clustering
-
             # initial prediction using MetaGeneMark model
-            list_of_temp.extend([meta_out, f"{meta_out}.fna"])
 
             # get GC of whole sequence for each sequence"
             gc_out = f"{tmpdir}/{meta_out}.feature"
@@ -369,27 +334,21 @@ def main(
                     str(run(gc_cmd.split(), capture_output=True).stdout, "utf-8")
                 )
 
-            list_of_temp.extend([gc_out])
-
             # determine bin number and range
-            # TODO: I don't believe the cutoff values returned
             bin_num, cutoffs, seq_GC = cluster(
                 feature_f=gc_out, clusters=bins, min_length=10000
             )
 
-            # bin_num = 3 #debugging
-            # Log("bin number = $bin_num\n");
-            # Log( "GC range = ".join(",",@$cutoffs)."\n" );
+            logging.info("bin number = $bin_num\n")
+            logging.info(f"GC range = {''.join([str(_) for _ in cutoffs])}\n")
 
-            # ------------------------------------------------
             # training
-
             models: List[str] = list()
             seqs: List[str] = list()
             # my %handles; # file handles for n bins.
             if bin_num == 1:
-                logging.info(
-                    f"train(input_seq=seqfile, seq={seq}, motif={motif},fixmotif={fixmotif},order={order},order_non={order_non},start_prefix={start_prefix},gibbs_prefix={gibbs_prefix},prestart={prestart},width={width},build_cmd={build},hmm_cmd={hmm},par={par},maxitr={maxitr},identity={identity},gibbs3={gibbs3},workpath={working_path}"
+                logging.debug(
+                    f"train(input_seq=seqfile, seq={seq}, motif={motif},fixmotif={fixmotif},order={order},order_non={order_non},start_prefix={start_prefix},gibbs_prefix={gibbs_prefix},prestart={prestart},width={width},build_cmd={build},hmm_cmd={hmm},par={par},maxitr={maxitr},identity={identity},gibbs3={gibbs3}"
                 )
                 final_model, new_tmp_files = train(
                     input_seq=seqfile,
@@ -408,17 +367,11 @@ def main(
                     maxitr=maxitr,
                     identity=identity,
                     gibbs3=gibbs3,
-                    workpath=working_path,
                     tmpdir=tmpdir,
                 )
-                logging.info(
-                    f"final_model: {final_model}, new_tmp_files: {new_tmp_files}"
-                )
-                list_of_temp.extend(new_tmp_files)
-                # -----------------------------
+                logging.info(f"final_model: {final_model}")
+
                 # make a GC file for the input file
-                # open NEWINPUT, ">", $newseq;
-                # -----------------------------
                 # read input sequences
                 try:
                     FA = pyfaidx.Fasta(seqfile)
@@ -426,8 +379,8 @@ def main(
                     for read in FA:
                         if read.long_name not in seq_GC_entries:
                             seq_GC[f">{read.long_name}"] = int(getGC(read[:].seq))
-                except:
-                    print(f"Cannot open {seqfile}")
+                except IOError as e:
+                    logging.critical(f"{e}\nCannot open {seqfile}")
 
             else:
                 # create sequence file for each bin
@@ -451,29 +404,29 @@ def main(
                         # decide which bin the sequence belongs to
                         if bin_num == 2:
                             if seq_GC[read_header] <= cutoffs[0]:
-                                bin = 1
+                                seq_bin = 1
                             else:
-                                bin = 2
+                                seq_bin = 2
                         else:
                             if seq_GC[read_header] <= cutoffs[0]:
-                                bin = 1
+                                seq_bin = 1
                             elif seq_GC[read_header] <= cutoffs[1]:
-                                bin = 2
+                                seq_bin = 2
                             else:
-                                bin = 3
+                                seq_bin = 3
                         # logging.info(f"Placed {read_header} into bin {bin}")
 
                         # output to corresponding output bin file
-                        with open(file=handles[bin], mode="w") as fh:
+                        with open(file=handles[seq_bin], mode="w") as fh:
                             fh.writelines(
                                 f"{read_header}\t[gc={seq_GC[read_header]}\n{read[:].seq}]\n"
                             )
-                except:
-                    logging.info(f"Cannot open {seqfile}")
+                except IOError as e:
+                    logging.critical(f"{e}\nCannot open {seqfile}")
                     print(f"Cannot open {seqfile}")
                 # train
                 for i in range(bin_num):
-                    current_model, new_tmp_files = train(
+                    current_model = train(
                         input_seq=seqs[i],
                         seq=seq,
                         motif=motif,
@@ -490,22 +443,21 @@ def main(
                         maxitr=maxitr,
                         identity=identity,
                         gibbs3=gibbs3,
-                        workpath=working_path,
                         bin_num=i,
                         tmpdir=tmpdir,
                     )
                     logging.info(f"train() returned: {current_model}")
                     if current_model:
                         models.extend([current_model])
-                    list_of_temp.extend(new_tmp_files)
+
                 # combine individual models to make the final model file
-                final_model = combineModel(models, cutoffs)
+                final_model = combineModel(mod=models, cut_offs=cutoffs, tmpdir=tmpdir)
                 logging.info(f"combineModel() returned: {final_model}")
 
-            run(f"cp {final_model} {out_name}".split())
-            logging.info(f"Ran 'cp {final_model} {out_name}' but not sure why?")
-            if out_name != final_model:
-                list_of_temp.extend([final_model])
+            run(f"cp {final_model} {tmpdir}/{out_name}".split())
+            logging.info(
+                f"Ran 'cp {final_model} {tmpdir}/{out_name}' but not sure why?"
+            )
 
         if outputformat == "GFF":
             format_gmhmmp = " -f G "
@@ -521,41 +473,26 @@ def main(
         # $hmm .= " -a $faa_out " if $faa;
         # $hmm .= " -d $fnn_out " if $fnn;
 
-        list_of_temp.extend(["with_seq.out"])
-
         if do_iterations:
             if motif:
-                command = (
-                    f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile}"
-                )
+                command = f"{hmm} -r -m {tmpdir}/{out_name} -o {output} {format_gmhmmp} {seqfile}"
                 result = run(command.split(), stdout=PIPE, stderr=STDOUT)
                 logging.debug(command)
-                logging.debug(f"line: 533 {str(result.stdout, 'utf-8')}")
+                logging.debug(f"{str(result.stdout, 'utf-8')}")
             else:
                 # no moitf option specified
-                command = f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}"
+                command = f"{hmm} -m {tmpdir}/{out_name} -o {output} {format_gmhmmp} {seqfile}"
                 result = run(command.split(), stdout=PIPE, stderr=STDOUT)
                 logging.debug(command)
-                logging.debug(f"line: 539 {str(result.stdout, 'utf-8')}")
+                logging.debug(f"{str(result.stdout, 'utf-8')}")
         else:
             meta_model = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
             # no iterations - use heuristic only
             command = f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}"
             result = run(command.split(), stdout=PIPE, stderr=STDOUT)
             logging.debug(command)
-            logging.debug(f"line: 546 {str(result.stdout, 'utf-8')}")
+            logging.debug(f"{str(result.stdout, 'utf-8')}")
 
-        # this seems stupid dangerous.
-        # TODO: replace with using tempfile.TemporaryDirectory
-        # if clean:
-        #     for _ in list_of_temp:
-        #         run(["rm", "-f", _])
-        # Final list was:
-        # ['initial.meta.lst', 'initial.meta.lst.fna',
-        #  '/tmp/tmpv1seq_gr/initial.meta.list.feature',
-        #  'itr_0.lst', 'itr_1.mod', 'itr_1.lst', 'itr_2.mod',
-        #  'itr_2.lst', 'itr_3.mod', 'itr_3.lst', 'itr_3.mod',
-        #  'with_seq.out']
         print(f"wrote final results to {output}")
 
 
@@ -576,7 +513,6 @@ def train(
     maxitr: int,  # 10
     identity: float,  # 0.99
     gibbs3: str,
-    workpath: str,
     bin_num: int = 0,
     tmpdir: Optional[str] = None,
 ) -> Tuple[Optional[str], List[str]]:
@@ -589,15 +525,16 @@ def train(
     # `probuild --par par_1.default --clean_join sequence --seq test.fa`
     # which seems kind of redundant, but what do I know
 
-    # TODO: we need to check that the input_sequence isn't empty here
+    if os.path.getsize(input_seq) == 0:
+        raise ValueError("the input sequence is empty")
+        logging.critical(f"the input sequence is empty")
+        return None
+
     command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq}"
     result = run(command.split(), stdout=PIPE, stderr=STDOUT)
     logging.debug(command)
-    logging.debug(f"line: 596 {str(result.stdout, 'utf-8')}")
-    # TODO: another thing to restore when we figure out logging.
-    # run([build_cmd, "--clean_join", seq, "--seq", input_seq, "--log", logfile])
+    logging.debug(f"{str(result.stdout, 'utf-8')}")
 
-    # ------------------------------------------------
     # tmp solution: get sequence size, get minimum sequence size from --par <file>
     # compare, skip iterations if short
 
@@ -625,20 +562,22 @@ def train(
         command = f"{build_cmd} {par} --clean_join {tmpdir}/{seq} --seq {input_seq} --MIN_CONTIG_SIZE 0 --GAP_FILLER"
         result = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
-        logging.debug(f"line: 628 {str(result.stdout, 'utf-8')}")
+        logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         init_mod = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
         next_item = f"{tmpdir}/{hmmout_prefix}{itr}_bin_{bin_num}{hmmout_suffix}"
         command = f"{hmm_cmd} -m {init_mod} -o {next_item} {tmpdir}/{seq}"
         result = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
-        logging.debug(f"line: 635 {str(result.stdout, 'utf-8')}")
+        logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         mod = f"{tmpdir}/bin_{bin_num}{mod_suffix}"
         command = f"{build_cmd} {par} --mkmod {mod} --seq {tmpdir}/{seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
 
         if motif and not fixmotif:
-            command = f"{command} --pre_start {start_seq} --PRE_START_WIDTH {prestart}"
+            command = (
+                f"{command} --pre_start {start_prefix} --PRE_START_WIDTH {prestart}"
+            )
         elif motif and fixmotif:
             command = (
                 f"{command} --fixmotif --PRE_START_WIDTH {prestart} --width {width}"
@@ -646,14 +585,14 @@ def train(
 
         results = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
-        logging.debug(f"line: 649 {str(result.stdout, 'utf-8')}")
-        return mod, tmp_files
+        logging.debug(f"{str(result.stdout, 'utf-8')}")
+        return mod
 
     # Log("do_iterations = $do_iterations\n")
 
     # ------------------------------------------------
     # run initial prediction
-    next_item = f"{hmmout_prefix}{itr}_bin_{bin_num}{hmmout_suffix}"
+    next_item = f"{tmpdir}/{hmmout_prefix}{itr}_bin_{bin_num}{hmmout_suffix}"
     print("run initial prediction")
 
     # form of! `gmhmmp -s d sequence -m MetaGeneMark_v1.mod -o itr_{itr}.lst`
@@ -661,10 +600,7 @@ def train(
     command = f"{hmm_cmd} -m {mod} -o {next_item} {seq}"
     result = run(command.split(), stdout=PIPE, stderr=STDOUT)
     logging.debug(command)
-    logging.debug(f"line: 664 {str(result.stdout, 'utf-8')}")
-
-    # TODO: tempfile
-    tmp_files.extend([next_item])
+    logging.debug(f"{str(result.stdout, 'utf-8')}")
 
     # enter iterations loop
     if do_iterations:
@@ -672,12 +608,12 @@ def train(
     while do_iterations:
         iterated = True
         itr += 1
-        mod = f"{mod_prefix}{itr}_bin_{bin_num}{mod_suffix}"
+        mod = f"{tmpdir}/{mod_prefix}{itr}_bin_{bin_num}{mod_suffix}"
         logging.info(f"iteration: {itr}, mod: {mod}")
 
         if motif and not fixmotif:
-            start_seq = f"{start_prefix}{itr}"
-            gibbs_out = f"{gibbs_prefix}{itr}"
+            start_seq = f"{tmpdir}/{start_prefix}{itr}"
+            gibbs_out = f"{tmpdir}/{gibbs_prefix}{itr}"
 
         command = f"{build_cmd} {par} --mkmod {mod} --seq {seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
 
@@ -692,9 +628,7 @@ def train(
         logging.info(f"build model: {mod} for iteration: {itr}")
         results = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
-        logging.debug(f"line: 695 {str(result.stdout, 'utf-8')}")
-
-        tmp_files.extend([mod])
+        logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         if (
             motif and not fixmotif
@@ -708,24 +642,21 @@ def train(
             command = f"{gibbs3} {start_seq} {width} -o {gibbs_out} -F -Z -n -r -y -x -m -s 1 -w 0.01"
             result = run(command.split(), stdout=PIPE, stderr=STDOUT)
             logging.debug(command)
-            logging.debug(f"line: 711 {str(result.stdout, 'utf-8')}")
-            tmp_files.extend([start_seq])
+            logging.debug(f"{str(result.stdout, 'utf-8')}")
 
             logging.info("make prestart model")
-            # TODO: logfile
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
             # form of! `probuild --par par_1.default --gibs gibbs_out.{itr} --mod itr_{itr}.mod --seq startseq.{itr}
             command = (
                 f"{build_cmd} {par} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}"
             )
             result = run(command.split(), stdout=PIPE, stderr=STDOUT)
-            tmp_files.extend([gibbs_out])
             logging.debug(command)
-            logging.debug(f"line: 724 {str(result.stdout, 'utf-8')}")
+            logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         prev = next_item
         # next_item = itr_{itr}.lst
-        next_item = f"{hmmout_prefix}{itr}_bin_{bin_num}{hmmout_suffix}"
+        next_item = f"{tmpdir}/{hmmout_prefix}{itr}_bin_{bin_num}{hmmout_suffix}"
 
         # form of! `gmhmmp -s d sequence -m itr_{itr}.mod -o itr_{itr}.lst
         command = f"{hmm_cmd} {seq} -m {mod} -o {next_item}"
@@ -737,8 +668,7 @@ def train(
         logging.info(f"prediction, iteration: {itr}")
         result = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
-        logging.debug(f"line: 740 {str(result.stdout, 'utf-8')}")
-        tmp_files.extend([next_item])
+        logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         # `probuild --par par_1.default --compare --source itr_{itr}.lst --target itr_{itr-1}.lst
         command = f"{build_cmd} {par} --compare --source {next_item} --target {prev}"
@@ -746,7 +676,7 @@ def train(
 
         results = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
-        logging.debug(f"line: 749 {str(result.stdout, 'utf-8')}")
+        logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         diff = str(results.stdout, "utf-8").strip("\n")
         logging.info(f"iteration {itr}, bin {bin_num} difference: {diff}")
@@ -778,14 +708,14 @@ def cluster(
             # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
             # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
             text = re.search(pattern=r"^>(.*?)\t(\d+)\s+(\d+)", string=line)
-            logging.debug(f"line 781: text.group(0) = {text.group(0)}")
+            logging.debug(f"text.group(0) = {text.group(0)}")
             if text:
                 header = text.group(1)  # Reference name
-                logging.debug(f"line 784: header = {header}")
+                logging.debug(f"header = {header}")
                 length = int(text.group(2))  # length of sequence?
-                logging.debug(f"line 786: header = {length}")
+                logging.debug(f"header = {length}")
                 seqGC = int(text.group(3))  # must be GC percentage
-                logging.debug(f"line 788: header = {seqGC}")
+                logging.debug(f"header = {seqGC}")
 
                 header_to_cod_GC[header] = seqGC
                 num_of_seq += 1
@@ -806,15 +736,14 @@ def cluster(
 
         if previous < total_length / 3 and gc_hash[key] >= total_length / 3:
             one_third = key
+            logging.debug(f"({one_third})->({gc_hash[one_third]})\n")
         if previous < total_length / 3 * 2 and gc_hash[key] >= total_length / 3 * 2:
             two_third = key
+            logging.debug(f"({two_third})->({gc_hash[two_third]})\n")
         if previous < total_length / 2 and gc_hash[key] >= total_length / 2:
             one_half = key
+            logging.debug(f"({one_half})->({gc_hash[one_half]})\n")
         previous = gc_hash[key]
-        # TODO: uncomment when we have logging fixed
-        # log.info(f"({one_third})->({gc_hash[one_third]})\n")
-        # log.info(f"({one_half})->({gc_hash[one_half]})\n")
-        # log.info(f"({two_third})->({gc_hash[two_third]})\n")
 
     if clusters == 0:
         # cluster number is not specified by user
@@ -850,20 +779,26 @@ def cluster(
     return clusters, cut_off_points, header_to_cod_GC
 
 
-# -----------------------------------------------
-# concatenate model files into one in MGM format:
-# starts with "__GC" and ends with "end"
-# -----------------------------------------------
+def combineModel(
+    mod: List[str],
+    cut_offs: List[int],
+    minGC: int = 30,
+    maxGC: int = 70,
+    tmpdir: str = ".",
+):
+    """
+    concatenate model files into one in MGM format:
+    starts with "__GC" and ends with "end"
+    """
 
-
-def combineModel(mod: List[str], cut_offs: List[int], minGC: int = 30, maxGC: int = 70):
     # change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
     cut_offs[0] = minGC
     cut_offs[-1] = maxGC
 
     b = 1
     data = str()
-    with open(file="final_model", mode="w") as model:
+    final_model = f"{tmpdir}/final_model.mod"
+    with open(file=final_model, mode="w") as model:
         for i in range(minGC, maxGC + 1):
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
@@ -878,7 +813,7 @@ def combineModel(mod: List[str], cut_offs: List[int], minGC: int = 30, maxGC: in
                 if b > len(mod):
                     break
                 b += 1
-    return "final_model"
+    return final_model
 
 
 if __name__ == "__main__":

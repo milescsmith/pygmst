@@ -57,7 +57,7 @@ class TestTrainFunction(unittest.TestCase):
                 maxitr=10,
                 identity=0.99,
                 gibbs3=self.gibbs3,
-                workpath=tmpdir,
+                tmpdir=tmpdir,
             )
 
             test_lst = f"{abspath(test_model).split('.')[0]}.lst"
