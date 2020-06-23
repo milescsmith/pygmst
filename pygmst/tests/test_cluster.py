@@ -11,9 +11,11 @@ class TestClusterFunction(unittest.TestCase):
         self.cluster_answers = json.loads(
             pkgutil.get_data("pygmst", "tests/cluster_answers.json")
         )
+        print("json loaded")
         self.assertTrue(exists(resource_filename("pygmst", "tests/initial.meta.list.feature")))
 
     def test_cluster(self):
+        print("run cluster")
         bin_num, cutoffs, seq_GC = pygmst.cluster(
             feature_f=resource_filename("pygmst", "tests/initial.meta.list.feature"), clusters=0, min_length=50000
         )

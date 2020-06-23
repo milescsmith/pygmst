@@ -463,6 +463,7 @@ my @models; #n models
 my %handles; # file handles for n bins.
 if($bin_num == 1){
     $final_model = train($seqfile);
+    &Log( "final_model: $final_model");
 
 =cut	
     #-----------------------------
@@ -543,7 +544,10 @@ else{
     
 }#more than one bin 
 
-&RunSystem( "cp $final_model $out_name", "output: $out_name\n" );
+# $final_model = "GeneMark_hmm.mod";
+
+# if ($final_model ne $out_name)
+  # {&RunSystem( "cp $final_model $out_name", "output: $out_name\n" );}
 push @list_of_temp, $final_model if $out_name ne $final_model;
 
 }#if $do_iterations, input sequence is long enough.
@@ -607,6 +611,7 @@ $time = localtime();
 # gms training
 # -----------------------------------------------
 sub train{
+    &Log( "entered training subroutine" );
     my $input_seq = shift;
     #------------------------------------------------
     # prepare sequence
@@ -622,7 +627,7 @@ sub train{
     my $minimum_sequence_size = `$command`;
     $minimum_sequence_size =~ s/\s*--MIN_SEQ_SIZE\s+//;
 
-    $do_iterations = 1;
+    $do_iterations = 0;
 
     if ( $sequence_size < $minimum_sequence_size )
     {
@@ -642,7 +647,9 @@ sub train{
     #------------------------------------------------
     # enter iterations loop
 
-    &Log( "entering iteration loop\n" );
+    if ($do_iterations){
+      &Log( "entering iteration loop\n" );
+    }
 
     while( $do_iterations )
     {
@@ -686,7 +693,7 @@ sub train{
     $prev = $next;
     $next = &GetNameForNext( $itr );
 
-    $command = "$hmm  $seq  -m $mod  -o $next";
+    $command = "$hmm $seq -m $mod -o $next";
     if ( $motif )
         { $command .= " -r"; }
 
@@ -870,6 +877,7 @@ sub read_fasta_seq {
 # -----------------------------------------------
 
 sub combineModel{
+  print \@_;
     my $mod = $_[0];
     my @cut_offs = @{$_[1]};
 #	my ($mod, $cut_offs) = @_;

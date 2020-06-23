@@ -159,3 +159,8 @@ itr_3.mod
 MANIFEST.in.bak
 pygmst/testfiles/.DS_Store
 .DS_Store
+pygmst/genemark/gmst_test.fnn
+pygmst/genemark/gmst_test.faa
+pygmst/genemark/gmst_test
+pygmst/genemark/initial.meta.lst.feature
+pygmst/genemark/sequence
