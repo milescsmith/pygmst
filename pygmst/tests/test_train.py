@@ -1,13 +1,16 @@
 import unittest
 import pkgutil
 import tempfile
-import json
 from numpy.testing import assert_approx_equal
 
 from pkg_resources import resource_filename
 from os.path import exists, splitext, basename, abspath
 from subprocess import run
-from .. import pygmst
+from pygmst import train
+
+import logging
+
+logging.basicConfig(filename="pygmst_test_train.log", filemode="w", level=logging.DEBUG)
 
 
 class TestTrainFunction(unittest.TestCase):
@@ -16,6 +19,9 @@ class TestTrainFunction(unittest.TestCase):
         #     resource_filename("pygmst", "tests/test_cluster.mod"), "r"
         # ) as test_cluster:
         #     self.expected_model = test_cluster.readlines()
+        logging.basicConfig(
+            filename="pygmst_test_train.log", filemode="w", level=logging.DEBUG
+        )
 
         self.testfasta = resource_filename("pygmst", "tests/test.fa")
         self.testsequence = resource_filename("pygmst", "tests/test_sequence")
@@ -34,7 +40,7 @@ class TestTrainFunction(unittest.TestCase):
     def test_cluster(self):
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            test_model, _ = pygmst.train(
+            test_model, _ = train(
                 input_seq=self.testfasta,
                 seq=self.testsequence,
                 motif=True,
@@ -55,13 +61,15 @@ class TestTrainFunction(unittest.TestCase):
             )
 
             test_lst = f"{abspath(test_model).split('.')[0]}.lst"
+            logging.debug("test_lst")
             command = f"{self.probuild} --par {self.par_1} --compare --source {resource_filename('pygmst', 'tests/actual.lst')} --target {test_lst}"
-            print(command)
+            logging.debug(command)
             self.diff = float(
                 str(run(command.split(), capture_output=True).stdout, "utf-8").strip(
                     "\n"
                 )
             )
+            logging.debug(self.diff)
 
             self.assertGreaterEqual(
                 self.diff,

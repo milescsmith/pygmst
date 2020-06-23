@@ -3,7 +3,11 @@ import pkgutil
 from pkg_resources import resource_filename
 from os.path import exists
 import json
-from .. import pygmst
+import logging
+
+from pygmst import cluster
+
+logging.basicConfig(level=logging.CRITICAL)
 
 
 class TestClusterFunction(unittest.TestCase):
@@ -12,28 +16,35 @@ class TestClusterFunction(unittest.TestCase):
             pkgutil.get_data("pygmst", "tests/cluster_answers.json")
         )
         print("json loaded")
-        self.assertTrue(exists(resource_filename("pygmst", "tests/initial.meta.list.feature")))
+        self.assertTrue(
+            exists(resource_filename("pygmst", "tests/initial.meta.list.feature"))
+        )
 
     def test_cluster(self):
         print("run cluster")
-        bin_num, cutoffs, seq_GC = pygmst.cluster(
-            feature_f=resource_filename("pygmst", "tests/initial.meta.list.feature"), clusters=0, min_length=50000
+        bin_num, cutoffs, seq_GC = cluster(
+            feature_f=resource_filename("pygmst", "tests/initial.meta.list.feature"),
+            clusters=0,
+            min_length=50000,
         )
+
         self.assertEqual(
-            first=bin_num,
-            second=self.cluster_answers["bin_num"],
+            bin_num,
+            self.cluster_answers["bin_num"],
             msg=f"function 'cluster' failed: bin_num is incorrect. should be {self.cluster_answers['bin_num']} but was {bin_num}",
         )
         self.assertEqual(
-            first=cutoffs,
-            second=self.cluster_answers["cutoffs"],
-            msg=f"function 'cluster' failed: bin_num is incorrect. should be {self.cluster_answers['cutoffs']} but was {cutoffs}",
+            cutoffs,
+            self.cluster_answers["cutoffs"],
+            msg=f"function 'cluster' failed: cutoffs is incorrect. should be {self.cluster_answers['cutoffs']} but was {cutoffs}",
         )
-        self.assertEqual(
-            first=seq_GC,
-            second=self.cluster_answers["seq_GC"],
-            msg=f"function 'cluster' failed: bin_num is incorrect.",
+
+        self.assertDictEqual(
+            seq_GC,
+            self.cluster_answers["seq_GC"],
+            msg=f"function 'cluster' failed: seq_GC is incorrect.",
         )
+
 
 if __name__ == "__main__":
     unittest.main()

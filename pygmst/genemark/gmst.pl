@@ -492,7 +492,9 @@ else{
     #	
     for(my $i = 1; $i <= $bin_num; ++$i){
         my $fh;
-        open ($fh, ">seq_bin_$i"); # create a file named f"seq_bin_{i}"
+        
+        
+        ; # create a file named f"seq_bin_{i}"
         push(@seqs, "seq_bin_$i"); # extend a list to include f"seq_bin_{i}" as an element
         #push @list_of_temp, "seq_bin_$i";
         $handles{$i} = $fh; # extend a dictionary to point to the new file, with i as the key
@@ -538,6 +540,7 @@ else{
     #train 
     for(my $i = 1; $i <= $bin_num; ++$i){
         $models[$i-1] = train( $seqs[$i-1] );
+        &Log( "line 541: added $models[$i-1]");
     }
     #combine individual models to make the final model file
     $final_model = combineModel( \@models, $cutoffs);
@@ -611,7 +614,7 @@ $time = localtime();
 # gms training
 # -----------------------------------------------
 sub train{
-    &Log( "entered training subroutine" );
+    &Log( "entered training subroutine\n" );
     my $input_seq = shift;
     #------------------------------------------------
     # prepare sequence
@@ -627,12 +630,14 @@ sub train{
     my $minimum_sequence_size = `$command`;
     $minimum_sequence_size =~ s/\s*--MIN_SEQ_SIZE\s+//;
 
-    $do_iterations = 0;
+    $do_iterations = 1;
 
-    if ( $sequence_size < $minimum_sequence_size )
-    {
-    &RunSystem( "$build --clean_join $seq --seq $input_seq --log $logfile --MIN_CONTIG_SIZE 0 --GAP_FILLER ", "prepare sequence\n" );
-    $do_iterations = 0;
+    &Log( "sequence_size: $sequence_size\n" );
+    &Log( "minimum_sequence_size: $minimum_sequence_size\n" );
+    
+    if ( $sequence_size < $minimum_sequence_size ){
+      &RunSystem( "$build --clean_join $seq --seq $input_seq --log $logfile --MIN_CONTIG_SIZE 0 --GAP_FILLER ", "prepare sequence\n" );
+      $do_iterations = 0;
     }
 
     &Log( "do_iterations = $do_iterations\n" );
@@ -651,66 +656,70 @@ sub train{
       &Log( "entering iteration loop\n" );
     }
 
-    while( $do_iterations )
-    {
-    $itr++;
-    $mod  = GetNameForMod( $itr );
+    while( $do_iterations ){
+      &Log("iteration $itr");
+      $itr++;
+      $mod  = GetNameForMod( $itr );
 
-    if ( $motif && !($fixmotif) )
-    {
+      if ( $motif && !($fixmotif) ){
         $start_seq = $start_prefix . $itr;
         $gibbs_out = $gibbs_prefix . $itr;
-    }
+      }
 
-    $command = "$build --mkmod $mod --seq $seq --geneset $next --ORDM $order --order_non $order_non --revcomp_non 1";
+      $command = "$build --mkmod $mod --seq $seq --geneset $next --ORDM $order --order_non $order_non --revcomp_non 1";
 
-    if ( $motif && !$fixmotif )
-    { $command .= " --pre_start $start_seq --PRE_START_WIDTH $prestart"; }
-    elsif ( $motif && $fixmotif )
-    { $command .= " --fixmotif --PRE_START_WIDTH $prestart --width $width --log $logfile"; }
+      if ( $motif && !$fixmotif ){
+        $command .= " --pre_start $start_seq --PRE_START_WIDTH $prestart";
+      }
+      elsif ( $motif && $fixmotif ){
+        $command .= " --fixmotif --PRE_START_WIDTH $prestart --width $width --log $logfile";
+      }
 
-    &RunSystem( $command, "build model: $mod for iteration: $itr\n" );
-    push @list_of_temp, $mod;
+      &RunSystem( $command, "build model: $mod for iteration: $itr\n" );
+      push @list_of_temp, $mod;
 
-    if ( $motif && !$fixmotif )
-    {
-        if ( $gibbs_version == 1 )
-        {
-            &RunSystem( "$gibbs $start_seq $width -n > $gibbs_out", "run gibbs sampler\n" );
-        }
-        elsif ( $gibbs_version == 3 )
-        {
-            #&RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -S 20  -y -x -m  -i 2000 -w 0.01", "run gibbs3 sampler\n" );
-            &RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" );
-        }
-    
-        push @list_of_temp, $start_seq;
+      if ( $motif && !$fixmotif )
+      {
+          if ( $gibbs_version == 1 ){
+              &RunSystem( "$gibbs $start_seq $width -n > $gibbs_out", "run gibbs sampler\n" );
+          }
+          elsif ( $gibbs_version == 3 ){
+              #&RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -S 20  -y -x -m  -i 2000 -w 0.01", "run gibbs3 sampler\n" );
+              &RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" );
+          }
+      
+          push @list_of_temp, $start_seq;
 
-        &RunSystem( "$build --gibbs $gibbs_out --mod $mod --seq $start_seq --log $logfile", "make prestart model\n" );
-        push @list_of_temp, $gibbs_out;
-    }
+          &RunSystem( "$build --gibbs $gibbs_out --mod $mod --seq $start_seq --log $logfile", "make prestart model\n" );
+          push @list_of_temp, $gibbs_out;
+      }
 
-    $prev = $next;
-    $next = &GetNameForNext( $itr );
+      $prev = $next;
+      $next = &GetNameForNext( $itr );
 
-    $command = "$hmm $seq -m $mod -o $next";
-    if ( $motif )
-        { $command .= " -r"; }
+      $command = "$hmm $seq -m $mod -o $next";
+      if ( $motif ){
+        $command .= " -r";
+      }
 
-    &RunSystem( $command, "prediction, iteration: $itr\n" );
-    push @list_of_temp, $next;
+      &RunSystem( $command, "prediction, iteration: $itr\n" );
+      push @list_of_temp, $next;
 
-    $command = "$build --compare --source $next --target $prev";
-    &Log( "compare:\n" . $command . "\n" );
+      $command = "$build --compare --source $next --target $prev";
+      &Log( "compare:\n" . $command . "\n" );
 
-    $diff = `$command`;
-    chomp( $diff );
-    &Log( "compare $prev and $next: $diff\n" );
+      $diff = `$command`;
+      chomp( $diff );
+      &Log( "compare $prev and $next: $diff\n" );
 
-    if ( $diff >= $identity )
-        { &Log( "Stopped iterations on identity: $diff\n" ); last; }
-    if ( $itr == $maxitr )
-        { &Log( "Stopped iterations on maximum number: $maxitr\n" ); last; }
+      if ( $diff >= $identity ){
+        &Log( "Stopped iterations on identity: $diff\n" );
+        last;
+      }
+      if ( $itr == $maxitr ){
+        &Log( "Stopped iterations on maximum number: $maxitr\n" );
+        last;
+      }
     }
     #------------------------------------------------
     # create ouput
@@ -719,13 +728,14 @@ sub train{
     if ( $do_iterations )
     {
         &RunSystem( "cp $mod $input_seq.mod", "create: $input_seq.mod\n" );
+        &Log( "Returning $input_seq.mod\n" );
         return $input_seq.".mod";
         
     }
     else
     { 
-    #	&RunSystem( "cp $imod $input_seq.mod", "create: $input_seq.mod\n" );
-    #	return $meta_model;
+      #	&RunSystem( "cp $imod $input_seq.mod", "create: $input_seq.mod\n" );
+      #	return $meta_model;
     }
 
 }
@@ -746,7 +756,10 @@ sub cluster{
     my $total_length = 0;
     my %header_to_cod_GC;
 
+    my $seq_GC_file = "seq_GC";
+    
     open (GC, "<", $feature_f) or die "can't open $feature_f: $!\n";
+    open( FILE, ">>$seq_GC_file" ) or die "can't open $seq_GC_file: $!\n";
     while (<GC>){
         next if ($_ !~ /^>(.*?)\t(\d+)\s+(\d+)/);
         my $header = $1;
@@ -756,12 +769,15 @@ sub cluster{
             $header = $1;
         }
         $header_to_cod_GC{$header} = $GC;
+        # print out a pseudo JSON formatted hash so we can compare the output of pygmst.cluster()
+        print FILE '"'.$header.': "'.$GC.'", '."\n";
         $num_of_seq ++;
         $total_length += $length;
         $gc_hash{$GC} += $length;
         #$gc_hash{$GC} ++;
     
     }
+    close FILE;
     close GC;
     
     my @sorted_GC = sort {$a<=>$b} keys %gc_hash;
