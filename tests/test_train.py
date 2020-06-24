@@ -4,7 +4,7 @@ import tempfile
 from pkg_resources import resource_filename
 from os.path import exists, basename, abspath
 from subprocess import run
-from pygmst import train
+from pygmst.pygmst import train
 
 import logging
 
@@ -14,15 +14,15 @@ logging.basicConfig(filename="pygmst_test_train.log", filemode="w", level=loggin
 class TestTrainFunction(unittest.TestCase):
     def setUp(self):
         # with open(
-        #     resource_filename("pygmst", "tests/test_cluster.mod"), "r"
+        #     resource_filename("tests", "test_cluster.mod"), "r"
         # ) as test_cluster:
         #     self.expected_model = test_cluster.readlines()
         logging.basicConfig(
             filename="pygmst_test_train.log", filemode="w", level=logging.DEBUG
         )
 
-        self.testfasta = resource_filename("pygmst", "tests/test.fa")
-        self.testsequence = resource_filename("pygmst", "tests/test_sequence")
+        self.testfasta = resource_filename("tests", "test.fa")
+        self.testsequence = resource_filename("tests", "test_sequence")
         self.probuild = resource_filename("pygmst", "genemark/probuild")
         self.gmhmmp = resource_filename("pygmst", "genemark/gmhmmp")
         self.par_1 = resource_filename("pygmst", "genemark/par_1.default")
@@ -60,7 +60,7 @@ class TestTrainFunction(unittest.TestCase):
 
             test_lst = f"{abspath(test_model).split('.')[0]}.lst"
             logging.debug("test_lst")
-            command = f"{self.probuild} --par {self.par_1} --compare --source {resource_filename('pygmst', 'tests/actual.lst')} --target {test_lst}"
+            command = f"{self.probuild} --par {self.par_1} --compare --source {resource_filename('tests', 'actual.lst')} --target {test_lst}"
             logging.debug(command)
             self.diff = float(
                 str(run(command.split(), capture_output=True).stdout, "utf-8").strip(

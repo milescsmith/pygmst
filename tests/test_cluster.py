@@ -5,7 +5,7 @@ from os.path import exists
 import json
 import logging
 
-from pygmst import cluster
+from pygmst.pygmst import cluster
 
 logging.basicConfig(level=logging.CRITICAL)
 
@@ -13,17 +13,17 @@ logging.basicConfig(level=logging.CRITICAL)
 class TestClusterFunction(unittest.TestCase):
     def setUp(self):
         self.cluster_answers = json.loads(
-            pkgutil.get_data("pygmst", "tests/cluster_answers.json")
+            pkgutil.get_data("tests", "cluster_answers.json")
         )
         print("json loaded")
         self.assertTrue(
-            exists(resource_filename("pygmst", "tests/initial.meta.list.feature"))
+            exists(resource_filename("tests", "initial.meta.list.feature"))
         )
 
     def test_cluster(self):
         print("run cluster")
         bin_num, cutoffs, seq_GC = cluster(
-            feature_f=resource_filename("pygmst", "tests/initial.meta.list.feature"),
+            feature_f=resource_filename("tests", "initial.meta.list.feature"),
             clusters=0,
             min_length=50000,
         )
