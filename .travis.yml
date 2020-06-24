@@ -11,9 +11,11 @@ install:
   - pip install pytest
   - pip install pytest-cov
   - pip install coveralls
+  - pip install tox-travis
   
-  script:
-  - pytest --cov=pygmst --cov-report=term-missing
+script:
+  - tox
+  # - pytest --cov=pygmst --cov-report=term-missing
 
-  after_success:
-    - coveralls
+after_success:
+  - coveralls

@@ -2,3 +2,4 @@ pygmst/genemark/* linguist-vendored=true
 pygmst/testfiles/* linguist-vendored=true
 pygmst/tests/initial.meta.list.feature linguist-vendored=true
 pygmst/tests/expected_combinedModel.mod linguist-vendored=true
+pygmst/_version.py export-subst

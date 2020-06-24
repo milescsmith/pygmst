@@ -2,8 +2,8 @@ include *.in
 include *.md
 include *.mod
 include *.txt
-include sequence
-recursive-include pygmst *.DS_Store
+include .coveragerc
+include tox.ini
 recursive-include pygmst *.default
 recursive-include pygmst *.fa
 recursive-include pygmst *.fai
