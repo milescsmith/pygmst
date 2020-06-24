@@ -12,7 +12,6 @@ import pyfaidx
 from Bio.SeqUtils import GC as getGC
 from sortedcontainers import SortedDict
 import tempfile
-from pkgutil import get_data
 from pkg_resources import resource_filename
 
 
@@ -195,7 +194,7 @@ verbose = False
 @click.argument("seqfile", type=str)
 @click.help_option(show_default=True)
 # @Log(verbose)
-def main(
+def gmst(
     seqfile: str,
     output: str,
     outputformat: Optional[str] = None,
@@ -293,8 +292,6 @@ def main(
         elif strand == "reverse":
             hmm = f"{hmm} -s r "
 
-        GC = 0
-
         ## tmp solution: get sequence size, get minimum sequence size from --par <file>
         ## compare, skip iterations if short
 
@@ -350,7 +347,7 @@ def main(
                 logging.debug(
                     f"train(input_seq=seqfile, seq={seq}, motif={motif},fixmotif={fixmotif},order={order},order_non={order_non},start_prefix={start_prefix},gibbs_prefix={gibbs_prefix},prestart={prestart},width={width},build_cmd={build},hmm_cmd={hmm},par={par},maxitr={maxitr},identity={identity},gibbs3={gibbs3}"
                 )
-                final_model, new_tmp_files = train(
+                final_model = train(
                     input_seq=seqfile,
                     seq=seq,
                     motif=motif,
@@ -515,8 +512,7 @@ def train(
     gibbs3: str,
     bin_num: int = 0,
     tmpdir: Optional[str] = None,
-) -> Tuple[Optional[str], List[str]]:
-    tmp_files: List[str] = list()
+) -> str:
     logging.info("Beginning training")
     # ------------------------------------------------
     # prepare sequence
@@ -550,7 +546,6 @@ def train(
     )
 
     do_iterations = True
-    iterated = bool()
     itr = 0
 
     logging.info(f"minimum_sequence_size: {minimum_sequence_size}")
@@ -685,9 +680,9 @@ def train(
             do_iterations = False
         if itr == maxitr:
             logging.info(f"Stopped iterations on maximum number: {maxitr}")
-            return mod, tmp_files
+            return mod
     logging.info(f"return value of train: {mod}")
-    return mod, tmp_files
+    return mod
 
 
 def cluster(
@@ -783,7 +778,7 @@ def combineModel(
     minGC: int = 30,
     maxGC: int = 70,
     tmpdir: str = ".",
-):
+) -> str:
     """
     concatenate model files into one in MGM format:
     starts with "__GC" and ends with "end"
@@ -817,4 +812,4 @@ def combineModel(
 if __name__ == "__main__":
     if "--verbose" in sys.argv:
         verbose = True
-    sys.exit(main())  # pragma: no cover
+    sys.exit(gmst())  # pragma: no cover

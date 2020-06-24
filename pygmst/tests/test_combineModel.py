@@ -1,12 +1,9 @@
 import unittest
-import pkgutil
 import tempfile
-import json
 from pygmst import combineModel
 
 from pkg_resources import resource_filename
-from os.path import exists, splitext, basename, abspath
-from subprocess import run
+from os.path import exists, basename, abspath
 
 
 class TestTrainFunction(unittest.TestCase):

@@ -1,10 +1,8 @@
 import unittest
-import pkgutil
 import tempfile
-from numpy.testing import assert_approx_equal
 
 from pkg_resources import resource_filename
-from os.path import exists, splitext, basename, abspath
+from os.path import exists, basename, abspath
 from subprocess import run
 from pygmst import train
 
@@ -40,7 +38,7 @@ class TestTrainFunction(unittest.TestCase):
     def test_cluster(self):
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            test_model, _ = train(
+            test_model = train(
                 input_seq=self.testfasta,
                 seq=self.testsequence,
                 motif=True,

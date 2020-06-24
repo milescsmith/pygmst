@@ -161,3 +161,5 @@ pygmst/genemark/gmst_test
 pygmst/genemark/initial.meta.lst.feature
 pygmst/genemark/sequence
 sequence
+coverage_html_report/
+.coveralls.yml
