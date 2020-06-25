@@ -484,6 +484,7 @@ def gmst(
                                 )
                         logging.info(f"Created {tmpdir}/seq_bin_{i}")
                     
+                    seqs = [f"{tmpdir}/seq_bin_{i}" for i in range(0, bin_num)]
                     # handles = SortedDict({k:f"{tmpdir}/seq_bin_{k}" for k in range(0, bin_num)})
                 except IOError as e:
                     logging.critical(f"{e}\nCannot open {seqfile}")
