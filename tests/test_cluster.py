@@ -16,9 +16,7 @@ class TestClusterFunction(unittest.TestCase):
             pkgutil.get_data("tests", "cluster_answers.json")
         )
         print("json loaded")
-        self.assertTrue(
-            exists(resource_filename("tests", "initial.meta.list.feature"))
-        )
+        self.assertTrue(exists(resource_filename("tests", "initial.meta.list.feature")))
 
     def test_cluster(self):
         print("run cluster")

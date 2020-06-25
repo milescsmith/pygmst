@@ -1,19 +1,18 @@
-__version__ = "0.1.0"
-
-import sys
-import os
-import click
-import re
 import logging
-from click_option_group import optgroup
-from typing import Optional, List, Tuple, Dict
-from subprocess import run, PIPE, STDOUT
+import os
+import re
+import sys
+import tempfile
+from subprocess import PIPE, STDOUT, run
+from typing import Dict, List, Optional, Tuple
+
+import click
 import pyfaidx
 from Bio.SeqUtils import GC as getGC
-from sortedcontainers import SortedDict
-import tempfile
+from click_option_group import optgroup
 from pkg_resources import resource_filename
-
+from sortedcontainers import SortedDict
+from setuptools_scm import get_version
 
 seq = "sequence"
 start_prefix = "startseq."
@@ -316,7 +315,7 @@ def gmst(
     if par is None:
         par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
     if version:
-        print(f"{__version__}")
+        print(f"{get_version(root='..', relative_to=__file__)}")
         sys.exit()
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -358,11 +357,12 @@ def gmst(
         with open(seqfile, "r") as _:
             sequence_size = len(_.read())
 
-        command = run(args=["grep", "MIN_SEQ_SIZE", par], capture_output=True)
+        command = f"grep MIN_SEQ_SIZE {par}"
+        result = run(args=command.split(), capture_output=True)
         minimum_sequence_size = int(
             re.findall(
                 pattern=r"\s*--MIN_SEQ_SIZE\s+(\d+)",
-                string=str(command.stdout, "utf=8"),
+                string=str(result.stdout, "utf=8"),
             )[0]
         )
 
@@ -381,7 +381,7 @@ def gmst(
 
             # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
             gc_cmd = f"{build} {par} --stat_fasta --seq {seqfile}"
-            with open(gc_out, "w") as gc_capture:
+            with open(gc_out, "w+") as gc_capture:
                 logging.debug(gc_cmd)
                 gc_capture.write(
                     str(run(gc_cmd.split(), capture_output=True).stdout, "utf-8")
@@ -438,45 +438,57 @@ def gmst(
             else:
                 # create sequence file for each bin
                 logging.info("Binning the input sequence")
-                handles = SortedDict()
-                for i in range(1, bin_num + 1):
-                    with open(file=f"{tmpdir}/seq_bin_{i}", mode="w") as fh:
-                        seqs.extend([f"{tmpdir}/seq_bin_{i}"])
-                        handles[i] = f"{tmpdir}/seq_bin_{i}"
-                        logging.info(f"Created {tmpdir}/seq_bin_{i}")
+                
+                # for i in range(0, bin_num):
+                #     with open(file=f"{tmpdir}/seq_bin_{i}", mode="w") as fh:
+                #         seqs.extend([f"{tmpdir}/seq_bin_{i}"])
+                #         handles[i] = f"{tmpdir}/seq_bin_{i}"
+                #         logging.info(f"Created {tmpdir}/seq_bin_{i}")
 
                 # read input sequences
-                try:
-                    FA = pyfaidx.Fasta(seqfile)
-                    seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
-                    for read in FA:
-                        read_header = read.long_name
-                        if read.long_name not in seq_GC_entries:
-                            seq_GC[read_header] = int(getGC(read[:].seq))
+                FA = pyfaidx.Fasta(seqfile, duplicate_action="longest")
+                seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
+                seq_bins: Dict[int, List[str]] = {
+                    k: [] for k in (_ for _ in range(0, bin_num))
+                }  # NEW! we are going to store the names of each read in a dictionary, which has a list member for each bin
+                for read in FA:  # for each record
+                    if (
+                        read.long_name not in seq_GC_entries
+                    ):  # if this has not already had the %GC determined
+                        seq_GC[read.long_name] = int(getGC(read[:].seq))  # Do it now
 
-                        # decide which bin the sequence belongs to
-                        if bin_num == 2:
-                            if seq_GC[read_header] <= cutoffs[0]:
-                                seq_bin = 1
-                            else:
-                                seq_bin = 2
+                        # decide which bin the sequence belongs to, add the name to the bin dictionary
+                    if (
+                        bin_num == 2
+                    ):  # if there are two bins, we can really only be above or below a cutoff
+                        if seq_GC[read.long_name] <= cutoffs[0]:
+                            seq_bins[0].extend([read.long_name])
                         else:
-                            if seq_GC[read_header] <= cutoffs[0]:
-                                seq_bin = 1
-                            elif seq_GC[read_header] <= cutoffs[1]:
-                                seq_bin = 2
-                            else:
-                                seq_bin = 3
-                        # logging.info(f"Placed {read_header} into bin {bin}")
+                            seq_bins[1].extend([read.long_name])
+                    else:  # else, does the read have low, medium, or high %GC?
+                        if seq_GC[read.long_name] <= cutoffs[0]:
+                            seq_bins[0].extend([read.long_name])
+                        elif seq_GC[read.long_name] <= cutoffs[1]:
+                            seq_bins[1].extend([read.long_name])
+                        else:
+                            seq_bins[2].extend([read.long_name])
+                    # logging.info(f"Placed {read_header} into bin {bin}")
 
-                        # output to corresponding output bin file
-                        with open(file=handles[seq_bin], mode="w") as fh:
-                            fh.writelines(
-                                f"{read_header}\t[gc={seq_GC[read_header]}\n{read[:].seq}]\n"
-                            )
+                # write all sequences to a bin file at once
+                try:
+                    for i in range(0, bin_num):
+                        with open(file=f"{tmpdir}/seq_bin_{i}", mode="w") as fh:
+                            for j in seq_bins[i]:
+                                fh.writelines(
+                                    f"{FA[j].long_name}\t[gc={seq_GC[j]}]\n{FA[j][:].seq}\n"  # modify the read.long_name to include the %GC
+                                )
+                        logging.info(f"Created {tmpdir}/seq_bin_{i}")
+                    
+                    # handles = SortedDict({k:f"{tmpdir}/seq_bin_{k}" for k in range(0, bin_num)})
                 except IOError as e:
                     logging.critical(f"{e}\nCannot open {seqfile}")
                     print(f"Cannot open {seqfile}")
+
                 # train
                 for i in range(bin_num):
                     current_model = train(
@@ -614,7 +626,7 @@ def train(
         logging.debug(f"{str(result.stdout, 'utf-8')}")
 
         init_mod = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
-        next_item = f"{tmpdir}/{hmmout_prefix}{itr}_bin_{bin_num}{hmmout_suffix}"
+        next_item = f"{tmpdir}/bin_{bin_num}{hmmout_suffix}"
         command = f"{hmm_cmd} -m {init_mod} -o {next_item} {tmpdir}/{seq}"
         result = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
@@ -635,7 +647,8 @@ def train(
         results = run(command.split(), stdout=PIPE, stderr=STDOUT)
         logging.debug(command)
         logging.debug(f"{str(result.stdout, 'utf-8')}")
-        return mod
+        return mod  # this may end up returning an empty file because the bin{bin_num}.lst file is empty or has insufficient number of entries.
+        # this, in turn, fouls up the
 
     # Log("do_iterations = $do_iterations\n")
 
@@ -655,7 +668,6 @@ def train(
     if do_iterations:
         logging.info("entering training iteration loop")
     while do_iterations:
-        iterated = True
         itr += 1
         mod = f"{tmpdir}/{mod_prefix}{itr}_bin_{bin_num}{mod_suffix}"
         logging.info(f"iteration: {itr}, mod: {mod}")
@@ -757,8 +769,8 @@ def cluster(
             # if the line is a fasta header in the form of '>(Reference sequence name)\t(number) (number)
             # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
             text = re.search(pattern=r"^>(.*?)\t(\d+)\s+(\d+)", string=line)
-            logging.debug(f"text.group(0) = {text.group(0)}")
             if text:
+                logging.debug(f"text.group(0) = {text.group(0)}")
                 header = text.group(1)  # Reference name
                 logging.debug(f"header = {header}")
                 length = int(text.group(2))  # length of sequence?
@@ -847,7 +859,7 @@ def combineModel(
     b = 1
     data = str()
     final_model = f"{tmpdir}/final_model.mod"
-    with open(file=final_model, mode="w") as model:
+    with open(file=final_model, mode="w+") as model:
         for i in range(minGC, maxGC + 1):
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
@@ -868,4 +880,4 @@ def combineModel(
 if __name__ == "__main__":
     if "--verbose" in sys.argv:
         verbose = True
-    sys.exit(gmst())  # pragma: no cover
+    sys.exit(main())  # pragma: no cover

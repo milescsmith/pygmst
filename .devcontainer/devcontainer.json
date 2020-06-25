@@ -7,10 +7,7 @@
         "context": "..",
         // Update 'VARIANT' to pick a Python version. Rebuild the container 
         // if it already exists to update. Available variants: 3, 3.6, 3.7, 3.8 
-        "args": { "VARIANT": "3" },
-        "mounts": [
-            "source=/Users/milessmith/workspace,target=/opt/workspaces,type=bind,consistency=cached"
-          ]
+        "args": { "VARIANT": "3" }
     },
 
     // Set *default* container specific settings.json values on container create.
@@ -33,7 +30,7 @@
     // Add the IDs of extensions you want installed when the container is created.
     "extensions": [
         "ms-python.python"
-    ]
+    ],
 
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": [],
@@ -42,7 +39,12 @@
     "postCreateCommand": [
         "pip3 install --user -r /workspaces/pygmst/requirements.txt",
         "pip3 install --user black ipython",
-    ]
+    ],
+
+    "mounts": [
+        "source=/home/milo/workspace,target=/opt/workspace,type=bind,consistency=cached",
+        "source=/mnt/scratch/guth-aci,target=/opt/scratch,type=bind,consistency=cached"
+      ]
         
 
     // Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
