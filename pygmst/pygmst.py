@@ -190,7 +190,7 @@ verbose = False
 )
 @optgroup.option("-v", "--verbose", count=True)
 @optgroup.option("--version", is_flag=True, default=False, show_default=True)
-@click.argument("seqfile", type=str)
+@click.argument("seqfile", type=str, required=False)
 @click.help_option(show_default=True)
 # @Log(verbose)
 def main(

@@ -10,7 +10,7 @@ class TestCombineFunction(unittest.TestCase):
     def setUp(self):
         self.model_1 = resource_filename("tests", "test_model_1.mod")
         self.model_2 = resource_filename("tests", "test_model_2.mod")
-        self.expected_combinedModel = resource_filename(
+        self.expected_combinedModels = resource_filename(
             "tests", "expected_combinedModels.mod"
         )
 
