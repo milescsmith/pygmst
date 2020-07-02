@@ -14,8 +14,6 @@ except ImportError:  # Deps not yet installed
 
 setup(
     name="pygmst",
-    use_scm_version=True,
-    setup_requires=["setuptools_scm"],
     description="Python reimplementation of GMST: Identification of protein coding regions in RNA transcripts",
     long_description=Path("README.rst").read_text("utf-8"),
     url="https://github.com/milescsmith/pygmst",
