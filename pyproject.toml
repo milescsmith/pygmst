@@ -1,6 +1,8 @@
 [build-system]
 requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.4"]
 build-backend = 'setuptools.build_meta'
+# requires = ["poetry_core>=1.0.0"]
+# build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 88
@@ -12,7 +14,7 @@ write_to = "pygmst/version.py"
 
 [tool.poetry]
 name = "pygmst"
-version = "0.3.0"
+version = "0.4.4"
 description = "Python translation of GeneMarks S-T"
 authors = ["Miles Smith <mileschristiansmith@gmail.com>"]
 license = "MPL-2.0"
@@ -35,22 +37,18 @@ pygmst = "pygmst.pygmst:gmst"
 
 [tool.poetry.dependencies]
 python = "^3.7"
-click = "7.0"
-click-option-group = "0.5.1"
-pyfaidx = "0.5.8"
-sortedcontainers = "2.2.2"
-biopython = "1.76"
-pre-commit = "2.5.1"
-tox = "3.15.2"
-pytest = "5.4.3"
-pytest-cov = "2.10.0"
-coveralls = "2.0.0"
-versioneer = "0.18"
+click = "^7.0"
+click-option-group = "^0.5.1"
+pyfaidx = "^0.5.8"
+sortedcontainers = "^2.2.2"
+biopython = "^1.77"
+pre-commit = "^2.5.1"
+tox = "^3.15.2"
+pytest = "^5.4.3"
+pytest-cov = "^2.10.0"
+coveralls = "^2.0.0"
+versioneer = "^0.18"
 setuptools-scm  = "^4.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.4"
-
-# [build-system]
-# requires = ["poetry>=0.12"]
-# build-backend = "poetry.masonry.api"

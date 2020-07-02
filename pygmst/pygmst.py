@@ -276,6 +276,10 @@ def gmst(
     verbose: int = 0,
     version: bool = False,
 ) -> None:
+    if version:
+        print(f"{get_version(root='..', relative_to=__file__)}")
+        sys.exit()
+
     if verbose == 1:
         logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.WARN)
     elif verbose == 2:
@@ -314,9 +318,6 @@ def gmst(
         width = 6
     if par is None:
         par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
-    if version:
-        print(f"{get_version(root='..', relative_to=__file__)}")
-        sys.exit()
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
@@ -343,9 +344,9 @@ def gmst(
 
         # set strand to predict
         if strand == "direct":
-            hmm = f"{hmm} -s d "
+            hmm = f"{hmm} -s d"
         elif strand == "reverse":
-            hmm = f"{hmm} -s r "
+            hmm = f"{hmm} -s r"
 
         ## tmp solution: get sequence size, get minimum sequence size from --par <file>
         ## compare, skip iterations if short
@@ -401,7 +402,22 @@ def gmst(
             # my %handles; # file handles for n bins.
             if bin_num == 1:
                 logging.debug(
-                    f"train(input_seq=seqfile, seq={seq}, motif={motif},fixmotif={fixmotif},order={order},order_non={order_non},start_prefix={start_prefix},gibbs_prefix={gibbs_prefix},prestart={prestart},width={width},build_cmd={build},hmm_cmd={hmm},par={par},maxitr={maxitr},identity={identity},gibbs3={gibbs3}"
+                    f"train(input_seq={seqfile}, "
+                    f"fseq={seq}, "
+                    f"motif={motif},"
+                    f"fixmotif={fixmotif}, "
+                    f"order={order}, "
+                    f"order_non={order_non}, "
+                    f"start_prefix={start_prefix}, "
+                    f"gibbs_prefix={gibbs_prefix}, "
+                    f"prestart={prestart}, "
+                    f"width={width}, "
+                    f"build_cmd={build}, "
+                    f"hmm_cmd={hmm}, "
+                    f"par={par}, "
+                    f"maxitr={maxitr}, "
+                    f"identity={identity}, "
+                    f"gibbs3={gibbs3})"
                 )
                 final_model = train(
                     input_seq=seqfile,
@@ -864,12 +880,13 @@ def combineModel(
         for i in range(minGC, maxGC + 1):
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
-                with open(file=mod[b - 1], mode="r") as fh:
-                    for line in fh:
-                        if "NAME" in line:
-                            line = line.strip("\n")
-                            line = f"{line}_GC<={i}\n"
-                        data += line
+                if os.path.exists(mod[b-1]):
+                    with open(file=mod[b - 1], mode="r") as fh:
+                        for line in fh:
+                            if "NAME" in line:
+                                line = line.strip("\n")
+                                line = f"{line}_GC<={i}\n"
+                            data += line
                 model.write(data)
                 model.write("end \t\n\n")
                 if b > len(mod):
