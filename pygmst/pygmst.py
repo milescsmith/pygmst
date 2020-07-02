@@ -14,6 +14,12 @@ from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
 from setuptools_scm import get_version
 
+try:
+    from importlib import metadata
+except ImportError:
+    # Running on pre-3.8 Python; use importlib-metadata package
+    import importlib_metadata as metadata
+
 seq = "sequence"
 start_prefix = "startseq."
 gibbs_prefix = "gibbs_out."
@@ -221,7 +227,7 @@ def main(
     version: bool = False,
 ) -> None:
     if version:
-        print(__version__)
+        print(metadata.version('pygmst'))
         sys.exit()
     elif seqfile is not None:
         gmst(
