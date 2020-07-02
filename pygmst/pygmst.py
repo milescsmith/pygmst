@@ -393,7 +393,7 @@ def gmst(
                 feature_f=gc_out, clusters=bins, min_length=10000
             )
 
-            logging.info("bin number = $bin_num\n")
+            logging.info(f"bin number = {bin_num}\n")
             logging.info(f"GC range = {''.join([str(_) for _ in cutoffs])}\n")
 
             # training
@@ -508,6 +508,7 @@ def gmst(
 
                 # train
                 for i in range(bin_num):
+                    logging.debug(f"training on {seqs[i]}")
                     current_model = train(
                         input_seq=seqs[i],
                         seq=seq,
@@ -532,9 +533,11 @@ def gmst(
                     if current_model:
                         models.extend([current_model])
 
-                # combine individual models to make the final model file
-                final_model = combineModel(mod=models, cut_offs=cutoffs, tmpdir=tmpdir)
-                logging.info(f"combineModel() returned: {final_model}")
+                logging.debug(f"combine {len(models)} individual models to make the final model file")
+                model_names = "\n".join(models)
+                logging.debug(f"those models are: {model_names}")
+                final_model = combineModels(mod=models, cut_offs=cutoffs, tmpdir=tmpdir)
+                logging.info(f"combineModels() returned: {final_model}")
 
             run(f"cp {final_model} {tmpdir}/{out_name}".split())
             logging.info(
@@ -773,6 +776,7 @@ def train(
 def cluster(
     feature_f: str, clusters: int, min_length: int = 10000
 ) -> Tuple[int, List[int], Dict[str, int]]:  # $gc_out, $bins
+    logging.debug("Beginning clustering")
     gc_hash: Dict[int, int] = dict()
     cut_off_points: List[int] = list()
     num_of_seq = 0
@@ -787,13 +791,13 @@ def cluster(
             # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
             text = re.search(pattern=r"^>(.*?)\t(\d+)\s+(\d+)", string=line)
             if text:
-                logging.debug(f"text.group(0) = {text.group(0)}")
+                # logging.debug(f"text.group(0) = {text.group(0)}")
                 header = text.group(1)  # Reference name
-                logging.debug(f"header = {header}")
+                # logging.debug(f"header = {header}")
                 length = int(text.group(2))  # length of sequence?
-                logging.debug(f"header = {length}")
+                # logging.debug(f"header = {length}")
                 seqGC = int(text.group(3))  # must be GC percentage
-                logging.debug(f"header = {seqGC}")
+                # logging.debug(f"header = {seqGC}")
 
                 header_to_cod_GC[header] = seqGC
                 num_of_seq += 1
@@ -857,7 +861,7 @@ def cluster(
     return clusters, cut_off_points, header_to_cod_GC
 
 
-def combineModel(
+def combineModels(
     mod: List[str],
     cut_offs: List[int],
     minGC: int = 30,
@@ -868,6 +872,9 @@ def combineModel(
     concatenate model files into one in MGM format:
     starts with "__GC" and ends with "end"
     """
+    logging.debug("combining models")
+    model_names = "\n".join(mod)
+    logging.debug(f"models for combining: {model_names}")
 
     # change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
     cut_offs[0] = minGC
@@ -880,6 +887,7 @@ def combineModel(
         for i in range(minGC, maxGC + 1):
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
+                logging.debug(f"combineModels processing {mod[b-1]}")
                 if os.path.exists(mod[b-1]):
                     with open(file=mod[b - 1], mode="r") as fh:
                         for line in fh:
@@ -887,6 +895,8 @@ def combineModel(
                                 line = line.strip("\n")
                                 line = f"{line}_GC<={i}\n"
                             data += line
+                else:
+                    logging.debug(f"combineModels could not find {mod[b-1]}")
                 model.write(data)
                 model.write("end \t\n\n")
                 if b > len(mod):
@@ -896,6 +906,4 @@ def combineModel(
 
 
 if __name__ == "__main__":
-    if "--verbose" in sys.argv:
-        verbose = True
     sys.exit(main())  # pragma: no cover
