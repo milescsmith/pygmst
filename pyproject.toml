@@ -13,9 +13,6 @@ skip-string-normalization = true
 # [tool.setuptools_scm]
 # write_to = "pygmst/version.py"
 
-[zest.releaser]
-python-file-with-version = pygmst/__init__.py
-
 [tool.poetry]
 name = "pygmst"
 version = "0.4.11"
