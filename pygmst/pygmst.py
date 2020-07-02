@@ -14,7 +14,7 @@ from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
 from setuptools_scm import get_version
 
-from .version import __version__
+from . import __version__
 
 seq = "sequence"
 start_prefix = "startseq."
