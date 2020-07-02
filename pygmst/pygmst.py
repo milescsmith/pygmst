@@ -14,7 +14,7 @@ from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
 from setuptools_scm import get_version
 
-from .version import version as __version__
+# from . import __version__
 
 seq = "sequence"
 start_prefix = "startseq."
@@ -196,8 +196,8 @@ verbose = False
 @click.help_option(show_default=True)
 # @Log(verbose)
 def main(
-    seqfile: str,
-    output: str,
+    seqfile: str = None,
+    output: str = None,
     outputformat: Optional[str] = None,
     fnn: bool = False,
     faa: bool = False,

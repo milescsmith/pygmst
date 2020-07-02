@@ -4,6 +4,13 @@ include *.mod
 include *.txt
 include .coveragerc
 include tox.ini
+include *.rst
+include *.lock
+include pygmst/genemark/Gibbs3
+include pygmst/genemark/README.GeneMarkS-T
+include pygmst/genemark/gm_key_64
+include pygmst/genemark/gmhmmp
+include pygmst/genemark/probuild
 recursive-include pygmst *.default
 recursive-include pygmst *.fa
 recursive-include pygmst *.fai
