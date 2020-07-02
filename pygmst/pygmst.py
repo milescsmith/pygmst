@@ -220,38 +220,44 @@ def main(
     verbose: int = 0,
     version: bool = False,
 ) -> None:
-    gmst(
-        seqfile,
-        output,
-        outputformat,
-        fnn,
-        faa,
-        clean,
-        bins,
-        prok,
-        filterseq,
-        strand,
-        order,
-        order_non,
-        gcode,
-        motifopt,
-        width,
-        prestart,
-        fixmotif,
-        offover,
-        par,
-        gibbs,
-        test,
-        identity,
-        maxitr,
-        verbose,
-        version,
-    )
+    if version:
+        print(f"{get_version(root='..', relative_to=__file__)}")
+        sys.exit()
+    elif seqfile is not None:
+        gmst(
+            seqfile,
+            output,
+            outputformat,
+            fnn,
+            faa,
+            clean,
+            bins,
+            prok,
+            filterseq,
+            strand,
+            order,
+            order_non,
+            gcode,
+            motifopt,
+            width,
+            prestart,
+            fixmotif,
+            offover,
+            par,
+            gibbs,
+            test,
+            identity,
+            maxitr,
+            verbose,
+            # version,
+        )
+    else:
+        print("Usage: pygmst [OPTION(s)]... SEQFILE\n\nTry `pygmst --help` for more options")
 
 
 def gmst(
-    seqfile: str,
-    output: str,
+    seqfile: str = None,
+    output: str = None,
     outputformat: Optional[str] = None,
     fnn: bool = False,
     faa: bool = False,
@@ -276,9 +282,6 @@ def gmst(
     verbose: int = 0,
     version: bool = False,
 ) -> None:
-    if version:
-        print(f"{get_version(root='..', relative_to=__file__)}")
-        sys.exit()
 
     if verbose == 1:
         logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.WARN)
@@ -906,4 +909,4 @@ def combineModels(
 
 
 if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover
+    main()  # pragma: no cover
