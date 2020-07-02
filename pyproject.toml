@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=42", "wheel", 'importlib-metadata ~= 1.0 ; python_version < "3.8"',]
 # requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.4"]
 # build-backend = 'setuptools.build_meta'
 # requires = ["poetry_core>=1.0.0"]
