@@ -23,8 +23,7 @@ setup(
     license="MPL2",
     python_requires=">=3.7",
     install_requires=[
-        'importlib-metadata ~= 1.0 ; python_version < "3.8"',
-        [l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()],
+        [l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()].extend(['importlib-metadata ~= 1.0 ; python_version < "3.8"']),
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
