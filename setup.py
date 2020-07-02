@@ -6,11 +6,11 @@ if sys.version_info < (3,):
 from pathlib import Path
 from setuptools import setup, find_packages
 
-try:
-    from pygmst import __author__, __email__, __version__
-except ImportError:  # Deps not yet installed
-    __author__ = "Miles Smith"
-    __email__ = "miles-smith@omrf.org"
+# try:
+from pygmst import __author__, __email__, __version__
+# except ImportError:  # Deps not yet installed
+#     __author__ = "Miles Smith"
+#     __email__ = "miles-smith@omrf.org"
 
 setup(
     name="pygmst",

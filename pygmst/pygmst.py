@@ -12,7 +12,6 @@ from Bio.SeqUtils import GC as getGC
 from click_option_group import optgroup
 from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
-from setuptools_scm import get_version
 
 try:
     from importlib import metadata
