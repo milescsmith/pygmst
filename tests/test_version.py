@@ -1,8 +1,5 @@
 import unittest
-from pkg_resources import resource_filename
-from os.path import exists
 import logging
-import tempfile
 
 try:
     from importlib import metadata
@@ -14,9 +11,9 @@ logging.basicConfig(level=logging.CRITICAL)
 
 
 class TestVersion(unittest.TestCase):
-    
     def test_version(self):
         print(metadata.version('pygmst'))
+
 
 if __name__ == "__main__":
     unittest.main()

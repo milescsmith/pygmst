@@ -1,7 +1,5 @@
 [build-system]
 requires = ["setuptools>=42", "wheel", 'importlib-metadata ~= 1.0 ; python_version < "3.8"',]
-# requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.4"]
-# build-backend = 'setuptools.build_meta'
 # requires = ["poetry_core>=1.0.0"]
 # build-backend = "poetry.core.masonry.api"
 
@@ -9,9 +7,6 @@ requires = ["setuptools>=42", "wheel", 'importlib-metadata ~= 1.0 ; python_versi
 line-length = 88
 target-version = ['py37', 'py38']
 skip-string-normalization = true
-
-# [tool.setuptools_scm]
-# write_to = "pygmst/version.py"
 
 [tool.poetry]
 name = "pygmst"

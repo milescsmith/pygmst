@@ -14,8 +14,6 @@ from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
 from setuptools_scm import get_version
 
-# from . import __version__
-
 seq = "sequence"
 start_prefix = "startseq."
 gibbs_prefix = "gibbs_out."
@@ -254,7 +252,9 @@ def main(
             # version,
         )
     else:
-        print("Usage: pygmst [OPTION(s)]... SEQFILE\n\nTry `pygmst --help` for more options")
+        print(
+            "Usage: pygmst [OPTION(s)]... SEQFILE\n\nTry `pygmst --help` for more options"
+        )
 
 
 def gmst(
@@ -459,7 +459,7 @@ def gmst(
             else:
                 # create sequence file for each bin
                 logging.info("Binning the input sequence")
-                
+
                 # for i in range(0, bin_num):
                 #     with open(file=f"{tmpdir}/seq_bin_{i}", mode="w") as fh:
                 #         seqs.extend([f"{tmpdir}/seq_bin_{i}"])
@@ -504,7 +504,7 @@ def gmst(
                                     f"{FA[j].long_name}\t[gc={seq_GC[j]}]\n{FA[j][:].seq}\n"  # modify the read.long_name to include the %GC
                                 )
                         logging.info(f"Created {tmpdir}/seq_bin_{i}")
-                    
+
                     seqs = [f"{tmpdir}/seq_bin_{i}" for i in range(0, bin_num)]
                     # handles = SortedDict({k:f"{tmpdir}/seq_bin_{k}" for k in range(0, bin_num)})
                 except IOError as e:
@@ -538,7 +538,9 @@ def gmst(
                     if current_model:
                         models.extend([current_model])
 
-                logging.debug(f"combine {len(models)} individual models to make the final model file")
+                logging.debug(
+                    f"combine {len(models)} individual models to make the final model file"
+                )
                 model_names = "\n".join(models)
                 logging.debug(f"those models are: {model_names}")
                 final_model = combineModels(mod=models, cut_offs=cutoffs, tmpdir=tmpdir)
@@ -893,7 +895,7 @@ def combineModels(
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
                 logging.debug(f"combineModels processing {mod[b-1]}")
-                if os.path.exists(mod[b-1]):
+                if os.path.exists(mod[b - 1]):
                     with open(file=mod[b - 1], mode="r") as fh:
                         for line in fh:
                             if "NAME" in line:
