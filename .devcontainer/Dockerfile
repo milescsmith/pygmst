@@ -32,4 +32,5 @@ RUN apt-get update --fix-missing && \
    rm -rf /tmp/downloaded_packages/* && \
    rm -rf /var/lib/apt/lists/*
 
-RUN mkdir /scratch
+COPY ./requirements-dev.txt /opt/requirements-dev.txt
+RUN pip install -r /opt/requirements-dev.txt

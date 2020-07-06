@@ -1,5 +1,4 @@
-pygmst/genemark/* linguist-vendored=true
+src/pygmst/genemark/* linguist-vendored=true
 testfiles/* linguist-vendored=true
 tests/initial.meta.list.feature linguist-vendored=true
 tests/expected_combinedModel.mod linguist-vendored=true
-pygmst/_version.py export-subst
