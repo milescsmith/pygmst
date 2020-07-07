@@ -911,15 +911,23 @@ def combineModels(
                                 line = line.strip("\n")
                                 line = f"{line}_GC<={i}\n"
                             data += line
+                    model.write(data)
+                    model.write("end \t\n\n")
                 else:
                     logging.debug(f"combineModels could not find {mod[b-1]}")
-                model.write(data)
-                model.write("end \t\n\n")
                 if b > len(mod):
                     break
                 b += 1
     return final_model
 
+def debug():
+    gmst(seqfile='/home/milo/workspace/isoseq/bc1006/demuxed.bc1006.flnc.unpolished.hq.collapsed.rep_corrected.fasta',
+        output='/home/milo/workspace/isoseq/test',
+        faa=True,
+        fnn=True,
+        strand='direct',
+        verbose=3)
 
 if __name__ == "__main__":
-    main()
+    # main()
+    debug()
