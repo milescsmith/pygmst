@@ -6,22 +6,22 @@ include .coveragerc
 include tox.ini
 include *.rst
 include *.lock
-include pygmst/genemark/Gibbs3
-include pygmst/genemark/README.GeneMarkS-T
-include pygmst/genemark/gm_key_64
-include pygmst/genemark/gmhmmp
-include pygmst/genemark/probuild
-recursive-include pygmst *.default
-recursive-include pygmst *.fa
-recursive-include pygmst *.fai
-recursive-include pygmst *.feature
-recursive-include pygmst *.ipynb
-recursive-include pygmst *.json
-recursive-include pygmst *.lst
-recursive-include pygmst *.mod
-recursive-exclude pygmst *.pl
-recursive-include pygmst *.py
-recursive-exclude pygmst *.tbl
+include src/pygmst/genemark/Gibbs3
+include src/pygmst/genemark/README.GeneMarkS-T
+include src/pygmst/genemark/gm_key_64
+include src/pygmst/genemark/gmhmmp
+include src/pygmst/genemark/probuild
+recursive-include src/pygmst *.default
+recursive-include src/pygmst *.fa
+recursive-include src/pygmst *.fai
+recursive-include src/pygmst *.feature
+recursive-include src/pygmst *.ipynb
+recursive-include src/pygmst *.json
+recursive-include src/pygmst *.lst
+recursive-include src/pygmst *.mod
+recursive-exclude src/pygmst *.pl
+recursive-include src/pygmst *.py
+recursive-exclude src/pygmst *.tbl
 recursive-exclude tests *.fa
 recursive-exclude tests *.faa
 recursive-exclude tests *.fai

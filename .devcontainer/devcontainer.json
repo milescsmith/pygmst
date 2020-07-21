@@ -29,8 +29,9 @@
 
     // Add the IDs of extensions you want installed when the container is created.
     "extensions": [
-        "ms-python.python"
-    ],
+		"ms-python.python",
+		"bungcip.better-toml"
+	],
 
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": [],
@@ -42,8 +43,9 @@
     ],
 
     "mounts": [
-        "source=/home/milo/workspace,target=/opt/workspace,type=bind,consistency=cached",
-        "source=/mnt/scratch/guth-aci,target=/opt/scratch,type=bind,consistency=cached"
+        "source=/home/milo/workspace,target=/opt/local,type=bind,consistency=cached",
+        // "source=/mnt/scratch/guth-aci,target=/opt/scratch,type=bind,consistency=cached"
+        "source=/mnt/scratch/guth-aci/,target=/opt/scratch/,type=bind,consistency=cached"
       ]
         
 

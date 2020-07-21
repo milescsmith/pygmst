@@ -4,7 +4,7 @@ python:
   - "3.7"
   - "3.8"
   - "3.8-dev"  # 3.8 development branch
-  - "nightly"  # nightly build
+#  - "nightly"  # nightly build # Don't build against nightly - it fails, and I don't even know what is going on with 3.10
 # command to install dependencies
 install:
   - pip install -r requirements.txt

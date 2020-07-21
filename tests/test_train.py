@@ -37,43 +37,43 @@ class TestTrainFunction(unittest.TestCase):
 
     def test_cluster(self):
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_model = train(
-                input_seq=self.testfasta,
-                seq=self.testsequence,
-                motif=True,
-                fixmotif=True,
-                order=4,
-                order_non=2,
-                start_prefix="startseq.",
-                gibbs_prefix="itr_",
-                prestart=6,
-                width=12,
-                build_cmd=f"{self.probuild} --par",
-                hmm_cmd=f"{self.gmhmmp} -s d",
-                par=f"{self.par_1}",
-                maxitr=10,
-                identity=0.99,
-                gibbs3=self.gibbs3,
-                tmpdir=tmpdir,
-            )
+        # with tempfile.TemporaryDirectory() as tmpdir:
+        test_model = train(
+            input_seq=self.testfasta,
+            seq=self.testsequence,
+            motif=True,
+            fixmotif=True,
+            order=4,
+            order_non=2,
+            start_prefix="startseq.",
+            gibbs_prefix="itr_",
+            prestart=6,
+            width=12,
+            build_cmd=f"{self.probuild} --par",
+            hmm_cmd=f"{self.gmhmmp} -s d",
+            par=f"{self.par_1}",
+            maxitr=10,
+            identity=0.99,
+            gibbs3=self.gibbs3,
+            # tmpdir=tmpdir,
+        )
 
-            test_lst = f"{abspath(test_model).split('.')[0]}.lst"
-            logging.debug("test_lst")
-            command = f"{self.probuild} --par {self.par_1} --compare --source {resource_filename('tests', 'actual.lst')} --target {test_lst}"
-            logging.debug(command)
-            self.diff = float(
-                str(run(command.split(), capture_output=True).stdout, "utf-8").strip(
-                    "\n"
-                )
+        test_lst = f"{abspath(test_model).split('.')[0]}.lst"
+        logging.debug("test_lst")
+        command = f"{self.probuild} --par {self.par_1} --compare --source {resource_filename('tests', 'actual.lst')} --target {test_lst}"
+        logging.debug(command)
+        self.diff = float(
+            str(run(command.split(), capture_output=True).stdout, "utf-8").strip(
+                "\n"
             )
-            logging.debug(self.diff)
+        )
+        logging.debug(self.diff)
 
-            self.assertGreaterEqual(
-                self.diff,
-                0.99,
-                msg=f"function 'train' failed: the resulting model is not similar to the expected one",
-            )
+        self.assertGreaterEqual(
+            self.diff,
+            0.99,
+            msg=f"function 'train' failed: the resulting model is not similar to the expected one",
+        )
 
 
 if __name__ == "__main__":
