@@ -16,4 +16,4 @@ r"""*Single-source version number for* ``pygmst``.
 
 __author__ = "Miles Smith"
 __email__ = "miles-smith@omrf.org"
-__version__ = '0.4.17'
+__version__ = '0.4.18'

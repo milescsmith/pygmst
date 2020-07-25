@@ -35,6 +35,25 @@ meta_out = "initial.meta.lst"
 gc_out = f"{meta_out}.feature"
 verbose = False
 
+def setup_logging(name: Optional[str] = None):
+    logger = logging.getLogger("sqanti3_qc")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
+
+    if name:
+        fh = logging.FileHandler(filename=name)
+    else:
+        fh = logging.FileHandler(filename=f"{__name__}.log)
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    st = logging.StreamHandler()
+    st.setLevel(logging.INFO)
+    st.setFormatter(formatter)
+    logger.addHandler(st)
+
 @click.command()
 @optgroup.group("Output options", help="output is in current working directory")
 @optgroup.option(
@@ -196,8 +215,8 @@ verbose = False
 @optgroup.option("-v", "--verbose", count=True)
 @optgroup.option("--version", is_flag=True, default=False, show_default=True)
 @click.argument("seqfile", type=str, required=False)
-@click.help_option(show_default=True)
-# @Log(verbose)
+@click.version_option()
+@click.help_option(show_default=False)
 def main(
     seqfile: str = None,
     output: str = None,
@@ -225,41 +244,44 @@ def main(
     verbose: int = 0,
     version: bool = False,
 ) -> None:
-    if version:
-        print(f"pygmst: {__version__}")
-        sys.exit()
-    elif seqfile is not None:
-        gmst(
-            seqfile = seqfile,
-            output = output,
-            outputformat = outputformat,
-            fnn = fnn,
-            faa = faa,
-            clean = clean,
-            bins = bins,
-            prok = prok,
-            filterseq = filterseq,
-            strand = strand,
-            order = order,
-            order_non = order_non,
-            gcode = gcode,
-            motifopt = motifopt,
-            width = width,
-            prestart = prestart,
-            fixmotif = fixmotif,
-            offover = offover,
-            par = par,
-            gibbs = gibbs,
-            test = test,
-            identity = identity,
-            maxitr = maxitr,
-            verbose = verbose,
-            version = version,
-        )
-    else:
-        print(
-            "Usage: pygmst [OPTION(s)]... SEQFILE\n\nTry `pygmst --help` for more options"
-        )
+    """Front end to GeneMark S-T.  Predict open reading frames from raw sequences
+
+    \b
+    Parameters
+    ----------
+    seqfile:
+        FASTA containing sequences to use for prediction
+
+    """
+    setup_logging("pygmst.log")
+
+    gmst(
+        seqfile = seqfile,
+        output = output,
+        outputformat = outputformat,
+        fnn = fnn,
+        faa = faa,
+        clean = clean,
+        bins = bins,
+        prok = prok,
+        filterseq = filterseq,
+        strand = strand,
+        order = order,
+        order_non = order_non,
+        gcode = gcode,
+        motifopt = motifopt,
+        width = width,
+        prestart = prestart,
+        fixmotif = fixmotif,
+        offover = offover,
+        par = par,
+        gibbs = gibbs,
+        test = test,
+        identity = identity,
+        maxitr = maxitr,
+        verbose = verbose,
+        version = version,
+    )
 
 
 def gmst(
