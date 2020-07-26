@@ -1,16 +1,16 @@
 #!/usr/bin/env python
+import os.path as osp
 import sys
+from pathlib import Path
+
+from setuptools import setup, find_packages
 
 if sys.version_info < (3,):
     sys.exit("pygmst requires Python >= 3.7")
-from pathlib import Path
-from setuptools import setup, find_packages
 
-# try:
-from pygmst import __author__, __email__, __version__
-# except ImportError:  # Deps not yet installed
-#     __author__ = "Miles Smith"
-#     __email__ = "miles-smith@omrf.org"
+with open(osp.join("src", "pygmst", "__about__.py")) as f:
+    exec(f.read())
+
 
 setup(
     name="pygmst",
@@ -23,8 +23,7 @@ setup(
     license="MPL2",
     python_requires=">=3.7",
     install_requires=[
-        'importlib-metadata ~= 1.0 ; python_version < "3.8"',
-        [l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()],
+        line.strip() for line in Path("requirements.txt").read_text("utf-8").splitlines()
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -38,11 +37,13 @@ setup(
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
     # extras_require=dict(doc=["sphinx", "sphinx_rtd_theme", "sphinx_autodoc_typehints"]),
-    entry_points={"console_scripts": ["pygmst = pygmst.pygmst:main"]},
-    packages=find_packages(exclude=('tests', 'testfiles', 'genemark')),
-    package_dir={"pygmst": "pygmst"},
-    package_data={"": ["genemark/*.*",]},
     include_package_data=True,
-    # test_suite='nose2.collector',
-    # tests_require=['nose2'],
+    entry_points={
+        "console_scripts": [
+            "pygmst = pygmst.pygmst:main"
+        ]
+    },
+    packages=find_packages(where="src"),
+    package_dir={"pygmst": "src/pygmst"},
+    package_data={"": ["pygmst/genemark/*.*",]},
 )

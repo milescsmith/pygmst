@@ -43,9 +43,9 @@
     ],
 
     "mounts": [
-        // "source=/home/milo/workspace,target=/opt/workspace,type=bind,consistency=cached",
+        "source=/home/milo/workspace,target=/opt/local,type=bind,consistency=cached",
         // "source=/mnt/scratch/guth-aci,target=/opt/scratch,type=bind,consistency=cached"
-        "source=/Users/milessmith/workspace,target=/opt/workspaces,type=bind,consistency=cached"
+        "source=/mnt/scratch/guth-aci/,target=/opt/scratch/,type=bind,consistency=cached"
       ]
         
 
