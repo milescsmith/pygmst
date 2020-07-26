@@ -35,14 +35,42 @@ meta_out = "initial.meta.lst"
 gc_out = f"{meta_out}.feature"
 verbose = False
 
+def setup_logging(name: Optional[str] = None):
+    if name:
+        logger = logging.getLogger(name)
+    else:
+        logger = logging.getLogger(__name__)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
+
+    if name:
+        fh = logging.FileHandler(filename=name)
+    else:
+        fh = logging.FileHandler(filename=f"{__name__}.log")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    st = logging.StreamHandler()
+    st.setLevel(logging.INFO)
+    st.setFormatter(formatter)
+    logger.addHandler(st)
+
 @click.command()
 @optgroup.group("Output options", help="output is in current working directory")
 @optgroup.option(
     "--output",
     "-o",
     type=str,
-    help="output file with predicted gene coordinates by GeneMarh.hmm and species parameters derived by GeneMarkS-T. If not provided, the file name will be taken from the input file. GeneMark.hmm can be executed independently after finishing GeneMarkS training.This method may be the preferable option in some situations, as it provides accesses to GeneMarh.hmm options.",
+    help=f"output file with predicted gene coordinates by GeneMark.hmm and"
+         f"species parameters derived by GeneMarkS-T. If not provided, the"
+         f"file name will be taken from the input file. GeneMark.hmm can be"
+         f"executed independently after finishing GeneMarkS training."
+         f"This method may be the preferable option in some situations, as"
+         f"it provides accesses to GeneMark.hmm options.",
     required=False,
+    default=None,
 )
 @optgroup.option(
     "--format",
@@ -196,11 +224,11 @@ verbose = False
 @optgroup.option("-v", "--verbose", count=True)
 @optgroup.option("--version", is_flag=True, default=False, show_default=True)
 @click.argument("seqfile", type=str, required=False)
-@click.help_option(show_default=True)
-# @Log(verbose)
+@click.version_option()
+@click.help_option(show_default=False)
 def main(
-    seqfile: str = None,
-    output: str = None,
+    seqfile: str,
+    output: Optional[str] = None,
     outputformat: Optional[str] = None,
     fnn: bool = False,
     faa: bool = False,
@@ -225,46 +253,49 @@ def main(
     verbose: int = 0,
     version: bool = False,
 ) -> None:
-    if version:
-        print(f"pygmst: {__version__}")
-        sys.exit()
-    elif seqfile is not None:
-        gmst(
-            seqfile = seqfile,
-            output = output,
-            outputformat = outputformat,
-            fnn = fnn,
-            faa = faa,
-            clean = clean,
-            bins = bins,
-            prok = prok,
-            filterseq = filterseq,
-            strand = strand,
-            order = order,
-            order_non = order_non,
-            gcode = gcode,
-            motifopt = motifopt,
-            width = width,
-            prestart = prestart,
-            fixmotif = fixmotif,
-            offover = offover,
-            par = par,
-            gibbs = gibbs,
-            test = test,
-            identity = identity,
-            maxitr = maxitr,
-            verbose = verbose,
-            version = version,
-        )
-    else:
-        print(
-            "Usage: pygmst [OPTION(s)]... SEQFILE\n\nTry `pygmst --help` for more options"
-        )
+    """Front end to GeneMark S-T.  Predict open reading frames from raw sequences
+
+    \b
+    Parameters
+    ----------
+    seqfile:
+        FASTA containing sequences to use for prediction
+
+    """
+    setup_logging("pygmst")
+
+    gmst(
+        seqfile = seqfile,
+        output = output,
+        outputformat = outputformat,
+        fnn = fnn,
+        faa = faa,
+        clean = clean,
+        bins = bins,
+        prok = prok,
+        filterseq = filterseq,
+        strand = strand,
+        order = order,
+        order_non = order_non,
+        gcode = gcode,
+        motifopt = motifopt,
+        width = width,
+        prestart = prestart,
+        fixmotif = fixmotif,
+        offover = offover,
+        par = par,
+        gibbs = gibbs,
+        test = test,
+        identity = identity,
+        maxitr = maxitr,
+        verbose = verbose,
+        version = version,
+    )
 
 
 def gmst(
-    seqfile: str = None,
-    output: str = None,
+    seqfile: str,
+    output: Optional[str] = None,
     outputformat: Optional[str] = None,
     fnn: bool = False,
     faa: bool = False,
@@ -301,7 +332,7 @@ def gmst(
     fixmotif = True if fixmotif == 1 else False  # for compatibility
 
     if output is None:
-        base = os.path.basename(input)
+        base = os.path.basename(seqfile)
         output = os.path.splitext(base)[0]
         if format == "LST":
             output = f"{output}.lst"
