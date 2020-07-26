@@ -60,8 +60,14 @@ def setup_logging(name: Optional[str] = None):
     "--output",
     "-o",
     type=str,
-    help="output file with predicted gene coordinates by GeneMarh.hmm and species parameters derived by GeneMarkS-T. If not provided, the file name will be taken from the input file. GeneMark.hmm can be executed independently after finishing GeneMarkS training.This method may be the preferable option in some situations, as it provides accesses to GeneMarh.hmm options.",
+    help=f"output file with predicted gene coordinates by GeneMark.hmm and"
+         f"species parameters derived by GeneMarkS-T. If not provided, the"
+         f"file name will be taken from the input file. GeneMark.hmm can be"
+         f"executed independently after finishing GeneMarkS training."
+         f"This method may be the preferable option in some situations, as"
+         f"it provides accesses to GeneMark.hmm options.",
     required=False,
+    default=None,
 )
 @optgroup.option(
     "--format",
@@ -218,8 +224,8 @@ def setup_logging(name: Optional[str] = None):
 @click.version_option()
 @click.help_option(show_default=False)
 def main(
-    seqfile: str = None,
-    output: str = None,
+    seqfile: str,
+    output: Optional[str] = None,
     outputformat: Optional[str] = None,
     fnn: bool = False,
     faa: bool = False,
@@ -285,8 +291,8 @@ def main(
 
 
 def gmst(
-    seqfile: str = None,
-    output: str = None,
+    seqfile: str,
+    output: Optional[str] = None,
     outputformat: Optional[str] = None,
     fnn: bool = False,
     faa: bool = False,
@@ -323,7 +329,7 @@ def gmst(
     fixmotif = True if fixmotif == 1 else False  # for compatibility
 
     if output is None:
-        base = os.path.basename(input)
+        base = os.path.basename(seqfile)
         output = os.path.splitext(base)[0]
         if format == "LST":
             output = f"{output}.lst"
