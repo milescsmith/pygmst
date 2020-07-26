@@ -36,7 +36,10 @@ gc_out = f"{meta_out}.feature"
 verbose = False
 
 def setup_logging(name: Optional[str] = None):
-    logger = logging.getLogger("sqanti3_qc")
+    if name:
+        logger = logging.getLogger(name)
+    else:
+        logger = logging.getLogger(__name__)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
@@ -259,7 +262,7 @@ def main(
         FASTA containing sequences to use for prediction
 
     """
-    setup_logging("pygmst.log")
+    setup_logging("pygmst")
 
     gmst(
         seqfile = seqfile,
