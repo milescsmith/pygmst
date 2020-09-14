@@ -3,8 +3,9 @@
 import logging
 import os
 import re
-import sys
-import tempfile
+#import sys
+from tempfile import NamedTemporaryFile
+from shutil import copyfile
 from subprocess import PIPE, STDOUT, check_output, CalledProcessError
 from typing import Dict, List, Optional, Tuple
 
@@ -16,7 +17,7 @@ from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
 
 try:
-    from .__about__ import __version__
+    from pygmst.__about__ import __version__
 except:
     pass
 
@@ -394,7 +395,16 @@ def gmst(
 
     # this should end up as something like
     # 'probuild --par par_1.default --clean_join sequence --seq test.fa
-    check_output(f"{build} {par} --clean_join {seq} --seq {seqfile}".split())
+
+    # okay, so probuild cannot tolerate a file with two dashes in the name
+    # I believe it thinks you are trying to pass an argument since it gives the
+    # generic "error in command line".  So, create a symlink with a non-offending
+    # name and use that
+
+    sinnombre = copyfile(src=seqfile, dst=NamedTemporaryFile().name)
+    probuild_cmd = f"{build} {par} --clean_join {seq} --seq {sinnombre}"
+    
+    check_output(probuild_cmd.split())
 
     with open(seqfile, "r") as _:
         sequence_size = len(_.read())
@@ -422,7 +432,7 @@ def gmst(
         gc_out = f"{meta_out}.feature"
 
         # form of! 'probuild --par par_1.default --stat_fasta --seq test.fa > initial.meta.list.feature'
-        gc_cmd = f"{build} {par} --stat_fasta --seq {seqfile}"
+        gc_cmd = f"{build} {par} --stat_fasta --seq {sinnombre}"
         with open(gc_out, "w+") as gc_capture:
             logging.debug(gc_cmd)
             gc_capture.write(
@@ -443,7 +453,7 @@ def gmst(
         # my %handles; # file handles for n bins.
         if bin_num == 1:
             logging.debug(
-                f"train(input_seq={seqfile}, "
+                f"train(input_seq={sinnombre}, "
                 f"fseq={seq}, "
                 f"motif={motif},"
                 f"fixmotif={fixmotif}, "

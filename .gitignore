@@ -163,3 +163,8 @@ pygmst/genemark/sequence
 sequence
 coverage_html_report/
 .coveralls.yml
+**/.___*
+**/._.*
+initial.meta.lst.feature
+final_model.mod
+GeneMark_hmm.mod
