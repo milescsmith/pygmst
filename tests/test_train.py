@@ -63,9 +63,7 @@ class TestTrainFunction(unittest.TestCase):
         command = f"{self.probuild} --par {self.par_1} --compare --source {resource_filename('tests', 'actual.lst')} --target {test_lst}"
         logging.debug(command)
         self.diff = float(
-            str(run(command.split(), capture_output=True).stdout, "utf-8").strip(
-                "\n"
-            )
+            str(run(command.split(), capture_output=True).stdout, "utf-8").strip("\n")
         )
         logging.debug(self.diff)
 

@@ -1,25 +1,48 @@
 #!/usr/bin/env python
 
 import logging
-import os
 import re
-#import sys
 from tempfile import NamedTemporaryFile
 from shutil import copyfile
-from subprocess import PIPE, STDOUT, check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
-import click
+
 import pyfaidx
 from Bio.SeqUtils import GC as getGC
-from click_option_group import optgroup
 from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
+import typer
+from enum import Enum, IntEnum
 
-try:
-    from pygmst.__about__ import __version__
-except:
-    pass
+from pygmst import __version__
+
+
+app = typer.Typer(name="pygmst", help="Python translation of GMST")
+
+
+class StrandOption(str, Enum):
+    direct = "direct"
+    reverse = "reverse"
+    both = "both"
+
+
+class TranslationTableOption(str, Enum):
+    eleven = "11"
+    four = "4"
+    one = "1"
+
+
+class MotifOption(str, Enum):
+    zero = "0"
+    one = "1"
+
+
+class GibbsOption(str, Enum):
+    one = "1"
+    three = "3"
+
 
 seq = "sequence"
 start_prefix = "startseq."
@@ -35,6 +58,14 @@ faa_out = ""
 meta_out = "initial.meta.lst"
 gc_out = f"{meta_out}.feature"
 verbose = False
+
+
+def version_callback(value: bool):
+    """Prints the version of the package."""
+    if value:
+        print(f"pygmst version: {__version__}")
+        raise typer.Exit()
+
 
 def setup_logging(name: Optional[str] = None):
     if name:
@@ -58,201 +89,104 @@ def setup_logging(name: Optional[str] = None):
     st.setFormatter(formatter)
     logger.addHandler(st)
 
-@click.command()
-@optgroup.group("Output options", help="output is in current working directory")
-@optgroup.option(
-    "--output",
-    "-o",
-    type=str,
-    help=f"output file with predicted gene coordinates by GeneMark.hmm and"
-         f"species parameters derived by GeneMarkS-T. If not provided, the"
-         f"file name will be taken from the input file. GeneMark.hmm can be"
-         f"executed independently after finishing GeneMarkS training."
-         f"This method may be the preferable option in some situations, as"
-         f"it provides accesses to GeneMark.hmm options.",
-    required=False,
-    default=None,
-)
-@optgroup.option(
-    "--format",
-    "outputformat",
-    type=str,
-    help="output coordinates of predicted genes in LST or GTF format.",
-    default="LST",
-    show_default=True,
-)
-@optgroup.option(
-    "--fnn",
-    is_flag=True,
-    help="create file with nucleotide sequence of predicted genes",
-    default=False,
-    show_default=True,
-)
-@optgroup.option(
-    "--faa",
-    is_flag=True,
-    help="create file with protein sequence of predicted genes",
-    default=False,
-    show_default=True,
-)
-@optgroup.option(
-    "--clean",
-    is_flag=True,
-    help="delete all temporary files",
-    default=True,
-    show_default=True,
-)
-# Run options:
-@optgroup.group("Run options")
-@optgroup.option(
-    "--bins",
-    type=click.IntRange(1, 4, clamp=True),
-    help="number of clusters for inhomogeneous genome. Use 0 for automatic clustering",
-    default=0,
-    show_default=True,
-)
-@optgroup.option(
-    "--filter",
-    "filterseq",
-    type=int,
-    help="keep at most one prediction per sequence",
-    show_default=True,
-    default=True,
-)
-@optgroup.option(
-    "--strand",
-    type=click.Choice(["direct", "reverse", "both"]),
-    help="sequence strand to predict genes in",
-    default="both",
-    show_default=True,
-)
-@optgroup.option(
-    "--order",
-    type=click.IntRange(1, 100, clamp=True),
-    help="markov chain order",
-    default=4,
-    show_default=True,
-)
-@optgroup.option(
-    "--order_non",
-    type=int,
-    help="order for non-coding parameters",
-    default=2,
-    show_default=True,
-)
-@optgroup.option(
-    "--gcode",
-    type=click.Choice(["11", "4", "1"]),
-    help="genetic code.  See https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi for codes.  Currently, only tables 1, 4, and 11 are allowed.",
-    default="1",
-    show_default=True,
-)
-@optgroup.option(
-    "--motif",
-    "motifopt",
-    type=click.Choice(["0", "1"]),
-    help="iterative search for a sequence motif associated with CDS start",
-    show_default=True,
-    default="1",
-)
-@optgroup.option(
-    "--width",
-    type=click.IntRange(3, 100),
-    help="motif width",
-    show_default=True,
-    default=12,
-)
-@optgroup.option(
-    "--prestart",
-    type=click.IntRange(0, 100),
-    help="length of sequence upstream of translation initiation site that presumably includes the motif",
-    show_default=True,
-    default=6,
-)
-@optgroup.option(
-    "--fixmotif",
-    type=bool,
-    is_flag=True,
-    help="the motif is located at a fixed position with regard to the start motif could overlap start codon. if this option is on, it changes the meaning of the --prestart option which in this case will define the distance from start codon to motif start",
-    show_default=True,
-    default=True,
-)
-@optgroup.option(
-    "--offover",
-    type=bool,
-    is_flag=True,
-    default=True,
-    help="prohibits gene overlap",
-    show_default=True,
-)
-@optgroup.group("Combined output and run options")
-@optgroup.option(
-    "--prok",
-    is_flag=True,
-    default=False,
-    help="to run program on prokaryotic transcripts (this option is the same as: --bins 1 --filter 0 --order 2 --order_non 2 --gcode 11 -width 6 --prestart 40 --fixmotif 0)",
-    show_default=True,
-)
-@optgroup.group("Test/developer options")
-@optgroup.option(
-    "--par",
-    type=str,
-    help="custom parameters for GeneMarkS (default is selected based on gcode value: 'par_<gcode>.default' )",
-    show_default=True,
-)
-@optgroup.option(
-    "--gibbs",
-    type=click.Choice(["1", "3"]),
-    default="3",
-    help="version of Gibbs sampler software (default: 3 supported versions: 1 and 3 )",
-    show_default=True,
-)
-@optgroup.option("--test", is_flag=True, default=False, help="installation test")
-@optgroup.option(
-    "--identity",
-    type=click.FloatRange(min=0, max=1, clamp=False),
-    default=0.99,
-    help="identity level assigned for termination of iterations",
-    show_default=True,
-)
-@optgroup.option(
-    "--maxitr",
-    type=int,
-    help="maximum number of iterations (default: 10 supported in range: >= 1)",
-    show_default=True,
-    default=10,
-)
-@optgroup.option("-v", "--verbose", count=True)
-@optgroup.option("--version", is_flag=True, default=False, show_default=True)
-@click.argument("seqfile", type=str, required=False)
-@click.version_option()
-@click.help_option(show_default=False)
-def main(
-    seqfile: str,
-    output: Optional[str] = None,
-    outputformat: Optional[str] = None,
-    fnn: bool = False,
-    faa: bool = False,
-    clean: bool = True,
-    bins: int = 0,
-    prok: bool = False,
-    filterseq: int = 1,
-    strand: str = "both",
-    order: int = 4,
-    order_non: int = 2,
-    gcode: str = "1",
-    motifopt: str = "1",
-    width: int = 12,
-    prestart: int = 6,
-    fixmotif: int = 1,
-    offover: bool = True,
-    par: Optional[str] = None,
-    gibbs: int = 3,
-    test: bool = False,
-    identity: float = 0.99,
-    maxitr: int = 10,
-    verbose: int = 0,
-    version: bool = False,
+
+@app.command(name="")
+def gmst(
+    seqfile: str = typer.Argument(...),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help=(
+            "output file with predicted gene coordinates by GeneMark.hmm and"
+            "species parameters derived by GeneMarkS-T. If not provided, the"
+            "file name will be taken from the input file. GeneMark.hmm can be"
+            "executed independently after finishing GeneMarkS training."
+            "This method may be the preferable option in some situations, as"
+            "it provides accesses to GeneMark.hmm options."
+        ),
+    ),
+    outputformat: Optional[str] = typer.Option(
+        "LST",
+        "--format",
+        "--outputformat",
+        help="output coordinates of predicted genes in LST or GTF format.",
+    ),
+    fnn: bool = typer.Option(
+        False, help="create file with nucleotide sequence of predicted genes"
+    ),
+    faa: bool = typer.Option(
+        False, help="create file with protein sequence of predicted genes"
+    ),
+    clean: bool = typer.Option(True, help="delete all temporary files"),
+    bins: int = typer.Option(
+        0,
+        min=1,
+        max=4,
+        clamp=True,
+        help="number of clusters for inhomogeneous genome. Use 0 for automatic clustering",
+    ),
+    prok: bool = typer.Option(
+        False,
+        help="to run program on prokaryotic transcripts (this option is the same as: --bins 1 --filter 0 --order 2 --order_non 2 --gcode 11 -width 6 --prestart 40 --fixmotif 0)",
+    ),
+    filterseq: int = typer.Option(
+        1, "--filter", help="keep at most one prediction per sequence"
+    ),
+    strand: StrandOption = typer.Option(
+        StrandOption.both, help="sequence strand to predict genes in"
+    ),
+    order: int = typer.Option(4, min=1, max=100, clamp=True, help="markov chain order"),
+    order_non: int = typer.Option(2, help="order for non-coding parameters"),
+    gcode: TranslationTableOption = typer.Option(
+        TranslationTableOption.one,
+        help="genetic code.  See https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi for codes.  Currently, only tables 1, 4, and 11 are allowed.",
+    ),
+    motifopt: MotifOption = typer.Option(
+        MotifOption.one,
+        "--motif",
+        help="iterative search for a sequence motif associated with CDS start",
+    ),
+    width: int = typer.Option(12, min=3, max=100, help="motif width"),
+    prestart: int = typer.Option(
+        6,
+        min=0,
+        max=100,
+        help="length of sequence upstream of translation initiation site that presumably includes the motif",
+    ),
+    fixmotif: bool = typer.Option(
+        True,
+        help="the motif is located at a fixed position with regard to the start motif could overlap start codon. if this option is on, it changes the meaning of the --prestart option which in this case will define the distance from start codon to motif start",
+    ),
+    offover: bool = typer.Option(True, help="prohibits gene overlap"),
+    par: Optional[str] = typer.Option(
+        None,
+        help="custom parameters for GeneMarkS (default is selected based on gcode value: 'par_<gcode>.default' )",
+    ),
+    gibbs: GibbsOption = typer.Option(
+        GibbsOption.three,
+        help="version of Gibbs sampler software (default: 3 supported versions: 1 and 3 )",
+    ),
+    test: bool = typer.Option(False, help="installation test"),
+    identity: float = typer.Option(
+        0.99,
+        min=0.0,
+        max=1.0,
+        help="identify level assigned for termination of iterations",
+    ),
+    maxitr: int = typer.Option(
+        10,
+        min=1,
+        help="maximum number of iterations (default: 10 supported in range: >= 1)",
+    ),
+    verbose: int = typer.Option(0, "--verbose", "-v", count=True),
+    version: bool = typer.Option(
+        None,
+        "--version",
+        callback=version_callback,
+        is_eager=True,
+        help="Prints the version of the SQANTI3 package.",
+    ),
 ) -> None:
     """Front end to GeneMark S-T.  Predict open reading frames from raw sequences
 
@@ -265,63 +199,6 @@ def main(
     """
     setup_logging("pygmst")
 
-    gmst(
-        seqfile = seqfile,
-        output = output,
-        outputformat = outputformat,
-        fnn = fnn,
-        faa = faa,
-        clean = clean,
-        bins = bins,
-        prok = prok,
-        filterseq = filterseq,
-        strand = strand,
-        order = order,
-        order_non = order_non,
-        gcode = gcode,
-        motifopt = motifopt,
-        width = width,
-        prestart = prestart,
-        fixmotif = fixmotif,
-        offover = offover,
-        par = par,
-        gibbs = gibbs,
-        test = test,
-        identity = identity,
-        maxitr = maxitr,
-        verbose = verbose,
-        version = version,
-    )
-
-
-def gmst(
-    seqfile: str,
-    output: Optional[str] = None,
-    outputformat: Optional[str] = None,
-    fnn: bool = False,
-    faa: bool = False,
-    clean: bool = True,
-    bins: int = 0,
-    prok: bool = False,
-    filterseq: int = 1,
-    strand: str = "both",
-    order: int = 4,
-    order_non: int = 2,
-    gcode: str = "1",
-    motifopt: str = "1",
-    width: int = 12,
-    prestart: int = 6,
-    fixmotif: int = 1,
-    offover: bool = True,
-    par: Optional[str] = None,
-    gibbs: int = 3,
-    test: bool = False,
-    identity: float = 0.99,
-    maxitr: int = 10,
-    verbose: int = 0,
-    version: bool = False,
-) -> None:
-
     if verbose == 1:
         logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.WARN)
     elif verbose == 2:
@@ -329,32 +206,35 @@ def gmst(
     elif verbose == 3:
         logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.DEBUG)
 
-    motif = True if motifopt == "1" else False  # for compatibility
+    motifopt = int(motifopt)
+    gcode = int(gcode)
+    gibbs = int(gibbs)
+
+    motif = bool(motifopt)  # for compatibility
     fixmotif = True if fixmotif == 1 else False  # for compatibility
 
+    seqfile = Path(seqfile)
     if output is None:
-        base = os.path.basename(seqfile)
-        output = os.path.splitext(base)[0]
-        if format == "LST":
-            output = f"{output}.lst"
-        elif format == "GFF":
-            output = f"{output}.gff"
+        if outputformat == "LST":
+            output = seqfile.with_suffix(".lst")
+        elif outputformat == "GFF":
+            output = seqfile.with_suffix(".gff")
         if fnn:
-            fnn_out = f"{output}.fnn"
+            fnn_out = seqfile.with_suffix(".fnn")
         if faa:
-            faa_out = f"{output}.faa"
+            faa_out = seqfile.with_suffix(".faa")
     else:
         if fnn:
-            fnn_out = f"{output}.fnn"
+            fnn_out = seqfile.with_suffix(".fnn")
         if faa:
-            faa_out = f"{output}.faa"
+            faa_out = seqfile.with_suffix(".faa")
     if prok:
         bins = 1
         filterseq = 0
         order = 2
         order_non = 2
         offover = False
-        gcode = "11"
+        gcode = 11
         fixmotif = False
         prestart = 40
         width = 6
@@ -401,9 +281,12 @@ def gmst(
     # generic "error in command line".  So, create a symlink with a non-offending
     # name and use that
 
+    if Path(seqfile).stat().st_size == 0:
+        raise ValueError(f"The input sequence {Path(seqfile).resolve()}is empty")
+
     sinnombre = copyfile(src=seqfile, dst=NamedTemporaryFile().name)
     probuild_cmd = f"{build} {par} --clean_join {seq} --seq {sinnombre}"
-    
+
     check_output(probuild_cmd.split())
 
     with open(seqfile, "r") as _:
@@ -435,9 +318,7 @@ def gmst(
         gc_cmd = f"{build} {par} --stat_fasta --seq {sinnombre}"
         with open(gc_out, "w+") as gc_capture:
             logging.debug(gc_cmd)
-            gc_capture.write(
-                str(check_output(gc_cmd.split()), "utf-8")
-            )
+            gc_capture.write(str(check_output(gc_cmd.split()), "utf-8"))
 
         # determine bin number and range
         bin_num, cutoffs, seq_GC = cluster(
@@ -589,13 +470,14 @@ def gmst(
             )
             model_names = "\n".join(models)
             logging.debug(f"those models are: {model_names}")
-            final_model = combineModels(mod=models, cut_offs=cutoffs,)# tmpdir=tmpdir)
+            final_model = combineModels(
+                mod=models,
+                cut_offs=cutoffs,
+            )  # tmpdir=tmpdir)
             logging.info(f"combineModels() returned: {final_model}")
 
         check_output(f"cp {final_model} {out_name}".split())
-        logging.info(
-            f"Ran 'cp {final_model} {out_name}' but not sure why?"
-        )
+        logging.info(f"Ran 'cp {final_model} {out_name}' but not sure why?")
 
     if outputformat == "GFF":
         format_gmhmmp = " -f G "
@@ -662,7 +544,7 @@ def train(
     # `probuild --par par_1.default --clean_join sequence --seq test.fa`
     # which seems kind of redundant, but what do I know
 
-    if os.path.getsize(input_seq) == 0:
+    if Path(input_seq).stat().st_size == 0:
         raise ValueError("the input sequence is empty")
 
     command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq}"
@@ -676,9 +558,7 @@ def train(
     with open(seq, "r") as _:
         sequence_size = len(_.read())
 
-    min_size_find_cmd = check_output(
-        args=f"grep MIN_SEQ_SIZE {par}".split()
-    )
+    min_size_find_cmd = check_output(args=f"grep MIN_SEQ_SIZE {par}".split())
     minimum_sequence_size = int(
         re.findall(
             pattern=r"\s*--MIN_SEQ_SIZE\s+(\d+)",
@@ -706,7 +586,7 @@ def train(
         logging.debug(f"{str(result, 'utf-8')}")
 
         mod = f"bin_{bin_num}{mod_suffix}"
-      # $command = "$build            --mkmod $mod  --seq $seq  --geneset $next       --ORDM $order  --order_non $order_non  --revcomp_non 1";
+        # $command = "$build            --mkmod $mod  --seq $seq  --geneset $next       --ORDM $order  --order_non $order_non  --revcomp_non 1";
         command = f"{build_cmd} {par} --mkmod {mod} --seq {seq} --geneset {next_item} --ORDM {order} --order_non {order_non} --revcomp_non 1"
 
         if motif and not fixmotif:
@@ -939,13 +819,13 @@ def combineModels(
 
     b = 1
     data = str()
-    final_model = f"final_model.mod"
+    final_model = "final_model.mod"
     with open(file=final_model, mode="w+") as model:
         for i in range(minGC, maxGC + 1):
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
                 logging.debug(f"combineModels processing {mod[b-1]}")
-                if os.path.exists(mod[b - 1]):
+                if Path(mod[b - 1]).exists():
                     with open(file=mod[b - 1], mode="r") as fh:
                         for line in fh:
                             if "NAME" in line:
@@ -961,14 +841,6 @@ def combineModels(
                 b += 1
     return final_model
 
-def debug():
-    gmst(seqfile='/home/milo/workspace/isoseq/bc1006/demuxed.bc1006.flnc.unpolished.hq.collapsed.rep_corrected.fasta',
-        output='/home/milo/workspace/isoseq/test',
-        faa=True,
-        fnn=True,
-        strand='direct',
-        verbose=3)
 
 if __name__ == "__main__":
-    # main()
-    debug()
+    app()

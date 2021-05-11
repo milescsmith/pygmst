@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.CRITICAL)
 
 class TestVersion(unittest.TestCase):
     def test_version(self):
-        print(metadata.version('pygmst'))
+        print(metadata.version("pygmst"))
 
 
 if __name__ == "__main__":
