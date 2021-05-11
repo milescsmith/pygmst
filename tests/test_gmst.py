@@ -29,8 +29,8 @@ class TestGMSTFunction(unittest.TestCase):
                 seqfile=self.fasta, output=prefix, faa=True, fnn=True, strand="direct"
             )  # test how we are actually going to use the module
 
-            with open(f"{prefix}", 'r') as res, open(
-                f"{prefix}.faa", 'r'
+            with open(f"{prefix}", "r") as res, open(
+                f"{prefix}.faa", "r"
             ) as resfaa, open(f"{prefix}.fnn", "r") as resfnn:
                 test_results = "".join(
                     res.readlines()[7:]
@@ -38,7 +38,7 @@ class TestGMSTFunction(unittest.TestCase):
                 test_faa = "".join(resfaa.readlines())
                 test_fnn = "".join(resfnn.readlines())
 
-            with open(self.results, 'r') as exp, open(self.faa, 'r') as expfaa, open(
+            with open(self.results, "r") as exp, open(self.faa, "r") as expfaa, open(
                 self.fnn, "r"
             ) as expfnn:
                 expected_results = "".join(exp.readlines()[7:])

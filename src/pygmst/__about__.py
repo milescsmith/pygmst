@@ -13,7 +13,3 @@ r"""*Single-source version number for* ``pygmst``.
 **License**
     The Mozilla Public License 2.0; see |license_rst|_ for full license terms
 """
-
-__author__ = "Miles Smith"
-__email__ = "miles-smith@omrf.org"
-__version__ = '0.4.19'

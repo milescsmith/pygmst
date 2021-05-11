@@ -25,7 +25,8 @@ class TestCombineFunction(unittest.TestCase):
 
         # with tempfile.TemporaryDirectory() as tmpdir:
         final_model = combineModels(
-            mod=[self.model_1, self.model_2], cut_offs=[30, 70], #tmpdir=tmpdir
+            mod=[self.model_1, self.model_2],
+            cut_offs=[30, 70],  # tmpdir=tmpdir
         )
 
         with open(final_model, "r") as fm, open(
