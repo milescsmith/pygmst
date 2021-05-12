@@ -206,9 +206,9 @@ def gmst(
     elif verbose == 3:
         logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.DEBUG)
 
-    motifopt = int(motifopt)
-    gcode = int(gcode)
-    gibbs = int(gibbs)
+    motifopt = int(motifopt.value)
+    gcode = int(gcode.value)
+    gibbs = int(gibbs.value)
 
     motif = bool(motifopt)  # for compatibility
     fixmotif = True if fixmotif == 1 else False  # for compatibility
