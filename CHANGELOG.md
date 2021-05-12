@@ -1,3 +1,9 @@
+# [0.5.1] - 2021-05-12
+
+## Fixed
+- Fix for typecasting string Enums to ints
+
+
 # [0.5.0] - 2021-05-11
 
 ## Changed
@@ -11,6 +17,7 @@
 ## Fixed
 - gmst() now checks that the file size for the sequence file isn't 0
 
+
 # [0.4.19] - 2020-09-14
 
 ## Fixes
@@ -20,3 +27,7 @@
 
 ## Additions
 * Add CHANGELOG.md
+
+[0.5.1]: https://github.com/milescsmith/pygmst/compare/0.5.0...0.5.1
+[0.5.0]: https://github.com/milescsmith/pygmst/compare/0.4.19...0.5.0
+[0.4.19]: https://github.com/milescsmith/pygmst/compare/0.4.18...0.4.19
