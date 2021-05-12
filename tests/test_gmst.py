@@ -1,8 +1,9 @@
-import unittest
-from pkg_resources import resource_filename
-from os.path import exists
 import logging
 import tempfile
+import unittest
+from os.path import exists
+
+from pkg_resources import resource_filename
 
 from pygmst.pygmst import gmst
 

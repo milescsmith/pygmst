@@ -1,5 +1,5 @@
-import unittest
 import logging
+import unittest
 
 try:
     from importlib import metadata

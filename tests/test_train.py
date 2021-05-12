@@ -1,12 +1,12 @@
-import unittest
+import logging
 import tempfile
+import unittest
+from os.path import abspath, basename, exists
+from subprocess import run
 
 from pkg_resources import resource_filename
-from os.path import exists, basename, abspath
-from subprocess import run
-from pygmst.pygmst import train
 
-import logging
+from pygmst.pygmst import train
 
 logging.basicConfig(filename="pygmst_test_train.log", filemode="w", level=logging.DEBUG)
 

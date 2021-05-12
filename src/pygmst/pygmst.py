@@ -2,22 +2,20 @@
 
 import logging
 import re
-from tempfile import NamedTemporaryFile
-from shutil import copyfile
-from subprocess import check_output, CalledProcessError
-from typing import Dict, List, Optional, Tuple
+from enum import Enum
 from pathlib import Path
-
+from shutil import copyfile
+from subprocess import CalledProcessError, check_output
+from tempfile import NamedTemporaryFile
+from typing import Dict, List, Optional, Tuple, Union
 
 import pyfaidx
+import typer
 from Bio.SeqUtils import GC as getGC
 from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
-import typer
-from enum import Enum, IntEnum
 
 from pygmst import __version__
-
 
 app = typer.Typer(name="pygmst", help="Python translation of GMST")
 
@@ -91,8 +89,8 @@ def setup_logging(name: Optional[str] = None):
 
 
 @app.command(name="")
-def gmst(
-    seqfile: str = typer.Argument(...),
+def main(
+    seqfile: Path = typer.Argument(...),
     output: Optional[str] = typer.Option(
         None,
         "--output",
@@ -206,12 +204,9 @@ def gmst(
     elif verbose == 3:
         logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.DEBUG)
 
-    motifopt = int(motifopt.value)
+    motifopt = bool(int(motifopt.value))
     gcode = int(gcode.value)
     gibbs = int(gibbs.value)
-
-    motif = bool(motifopt)  # for compatibility
-    fixmotif = True if fixmotif == 1 else False  # for compatibility
 
     seqfile = Path(seqfile)
     if output is None:
@@ -219,15 +214,10 @@ def gmst(
             output = seqfile.with_suffix(".lst")
         elif outputformat == "GFF":
             output = seqfile.with_suffix(".gff")
-        if fnn:
-            fnn_out = seqfile.with_suffix(".fnn")
-        if faa:
-            faa_out = seqfile.with_suffix(".faa")
-    else:
-        if fnn:
-            fnn_out = seqfile.with_suffix(".fnn")
-        if faa:
-            faa_out = seqfile.with_suffix(".faa")
+    if fnn:
+        fnn_out = seqfile.with_suffix(".fnn")
+    if faa:
+        faa_out = seqfile.with_suffix(".faa")
     if prok:
         bins = 1
         filterseq = 0
@@ -240,6 +230,68 @@ def gmst(
         width = 6
     if par is None:
         par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
+
+    gmst(
+        seqfile=seqfile,
+        output=output,
+        outputformat=outputformat,
+        fnn=fnn,
+        faa=faa,
+        clean=clean,
+        bins=bins,
+        filterseq=filterseq,
+        strand=strand,
+        order=order,
+        order_non=order_non,
+        gcode=gcode,
+        motifopt=motifopt,
+        width=width,
+        prestart=prestart,
+        fixmotif=fixmotif,
+        offover=offover,
+        par=par,
+        gibbs=gibbs,
+        test=test,
+        identity=identity,
+        maxitr=maxitr,
+        fnn_out=fnn_out,
+        faa_out=faa_out,
+    )
+
+
+def gmst(
+    seqfile: Union[str, Path],
+    output: Optional[str] = None,
+    outputformat: Optional[str] = None,
+    fnn: bool = False,
+    faa: bool = False,
+    clean: bool = True,
+    bins: int = 0,
+    filterseq: int = 1,
+    strand: str = "both",
+    order: int = 4,
+    order_non: int = 2,
+    gcode: str = "1",
+    motif: bool = True,
+    width: int = 12,
+    prestart: int = 6,
+    fixmotif: bool = True,
+    offover: bool = True,
+    par: Optional[str] = None,
+    gibbs: int = 3,
+    test: bool = False,
+    identity: float = 0.99,
+    maxitr: int = 10,
+    fnn_out: Optional[str] = None,
+    faa_out: Optional[str] = None,
+) -> None:
+
+    seqfile = Path(seqfile)
+
+    if fnn_out is None:
+        fnn_out = seqfile.with_suffix(".fnn")
+    if faa_out is None:
+        faa_out = seqfile.with_suffix(".faa")
 
     # with tempfile.TemporaryDirectory() as tmpdir:
     # tmpdir = tempfile.mkdtemp()

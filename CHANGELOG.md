@@ -1,3 +1,9 @@
+# [0.5.2] - 2021-05-12
+
+## Changed
+- Restored `main()` so that it can perform several checks and some typer-related
+  type conversions before passing off to `gmst()`
+
 # [0.5.1] - 2021-05-12
 
 ## Fixed
@@ -28,6 +34,7 @@
 ## Additions
 * Add CHANGELOG.md
 
+[0.5.2]: https://github.com/milescsmith/pygmst/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/milescsmith/pygmst/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/milescsmith/pygmst/compare/0.4.19...0.5.0
 [0.4.19]: https://github.com/milescsmith/pygmst/compare/0.4.18...0.4.19

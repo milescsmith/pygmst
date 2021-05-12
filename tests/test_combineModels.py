@@ -1,9 +1,10 @@
-import unittest
 import tempfile
-from pygmst.pygmst import combineModels
+import unittest
+from os.path import abspath, basename, exists
 
 from pkg_resources import resource_filename
-from os.path import exists, basename, abspath
+
+from pygmst.pygmst import combineModels
 
 
 class TestCombineFunction(unittest.TestCase):

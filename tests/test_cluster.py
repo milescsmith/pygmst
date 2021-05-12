@@ -1,9 +1,10 @@
-import unittest
-import pkgutil
-from pkg_resources import resource_filename
-from os.path import exists
 import json
 import logging
+import pkgutil
+import unittest
+from os.path import exists
+
+from pkg_resources import resource_filename
 
 from pygmst.pygmst import cluster
 
