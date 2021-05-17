@@ -1,3 +1,8 @@
+# [0.5.3] - 2021-05-17
+
+## Fixed
+- Fixed a few instances where default values are set in main but needed in gmst
+  and are not there when gmst is called directly.
 # [0.5.2] - 2021-05-12
 
 ## Changed
