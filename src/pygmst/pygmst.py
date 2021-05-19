@@ -267,7 +267,10 @@ def gmst(
 ) -> None:
 
     logger = logging.getLogger(__name__)
-    seqfile = Path(seqfile)
+    if type(seqfile) == "str":
+        seqfile_path = Path(seqfile)
+    else:
+        seqfile_path = seqfile
 
     # we need this because sqanti3_qc calls gmst() directly
     # while the default value for par is set in main()
@@ -275,9 +278,9 @@ def gmst(
         par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
 
     if fnn_out is None:
-        fnn_out = seqfile.with_suffix(".fnn")
+        fnn_out = seqfile_path.with_suffix(".fnn")
     if faa_out is None:
-        faa_out = seqfile.with_suffix(".faa")
+        faa_out = seqfile_path.with_suffix(".faa")
 
     if output is None:
         output = ""
@@ -322,17 +325,17 @@ def gmst(
     # generic "error in command line".  So, create a symlink with a non-offending
     # name and use that
 
-    if Path(seqfile).stat().st_size == 0:
-        raise ValueError(f"The input sequence {Path(seqfile).resolve()}is empty")
+    if seqfile_path.stat().st_size == 0:
+        raise ValueError(f"The input sequence {seqfile_path.resolve()}is empty")
 
-    sinnombre = copyfile(src=seqfile, dst=NamedTemporaryFile().name)
+    sinnombre = copyfile(src=seqfile_path, dst=NamedTemporaryFile().name)
     probuild_cmd = f"{build} {par} --clean_join {seq} --seq {sinnombre}"
 
     logger.debug(f"copied sequence file at {sinnombre}")
     logger.debug(f"probuild command: {probuild_cmd}")
     check_output(probuild_cmd.split())
 
-    with open(seqfile, "r") as _:
+    with open(seqfile_path, "r") as _:
         sequence_size = len(_.read())
 
     command = f"grep MIN_SEQ_SIZE {par}"
@@ -395,7 +398,7 @@ def gmst(
                 f"gibbs3={gibbs3})"
             )
             final_model = train(
-                input_seq=seqfile,
+                input_seq=seqfile_path,
                 seq=seq,
                 motif=motif,
                 fixmotif=fixmotif,
@@ -418,13 +421,13 @@ def gmst(
             # make a GC file for the input file
             # read input sequences
             try:
-                FA = pyfaidx.Fasta(str(seqfile), duplicate_action="longest")
+                FA = pyfaidx.Fasta(str(seqfile_path), duplicate_action="longest")
                 seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
                 for read in FA:
                     if read.long_name not in seq_GC_entries:
                         seq_GC[f">{read.long_name}"] = int(getGC(read[:].seq))
             except IOError as e:
-                logging.critical(f"{e}\nCannot open {seqfile}")
+                logging.critical(f"{e}\nCannot open {seqfile_path}")
 
         else:
             # create sequence file for each bin
@@ -437,7 +440,7 @@ def gmst(
             #         logging.info(f"Created {tmpdir}/seq_bin_{i}")
 
             # read input sequences
-            FA = pyfaidx.Fasta(str(seqfile), duplicate_action="longest")
+            FA = pyfaidx.Fasta(str(seqfile_path), duplicate_action="longest")
             seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
             seq_bins: Dict[int, List[str]] = {
                 k: [] for k in (_ for _ in range(0, bin_num))
@@ -478,8 +481,8 @@ def gmst(
                 seqs = [f"seq_bin_{i}" for i in range(0, bin_num)]
                 # handles = SortedDict({k:f"{tmpdir}/seq_bin_{k}" for k in range(0, bin_num)})
             except IOError as e:
-                logging.critical(f"{e}\nCannot open {seqfile}")
-                print(f"Cannot open {seqfile}")
+                logging.critical(f"{e}\nCannot open {seqfile_path}")
+                print(f"Cannot open {seqfile_path}")
 
             # train
             for i in range(bin_num):
@@ -538,20 +541,20 @@ def gmst(
 
     if do_iterations:
         if motif:
-            command = f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile}"
+            command = f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile_path}"
             result = check_output(command.split())
             logger.debug(command)
             logger.debug(f"{str(result, 'utf-8')}")
         else:
             # no moitf option specified
-            command = f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}"
+            command = f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile_path}"
             result = check_output(command.split())
             logger.debug(command)
             logger.debug(f"{str(result, 'utf-8')}")
     else:
         meta_model = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
         # no iterations - use heuristic only
-        command = f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}"
+        command = f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile_path}"
         result = check_output(command.split())
         logger.debug(command)
         logger.debug(f"{str(result, 'utf-8')}")
@@ -560,7 +563,7 @@ def gmst(
 
 
 def train(
-    input_seq: str,  # test.fa
+    input_seq: Union[Path, str],  # test.fa
     seq: str,  # sequence
     motif: bool,  # True
     fixmotif: bool,  # True
@@ -581,6 +584,11 @@ def train(
 ) -> str:
     logger = logging.getLogger(__name__)
     logger.info("Beginning training")
+
+    if type(input_seq) == "str":
+        input_seq_path = Path(input_seq)
+    else:
+        input_seq_path = input_seq
     # ------------------------------------------------
     # prepare sequence
     # build_cmd should have the form of! `probuild --par par_1.default`
@@ -588,10 +596,10 @@ def train(
     # `probuild --par par_1.default --clean_join sequence --seq test.fa`
     # which seems kind of redundant, but what do I know
 
-    if Path(input_seq).stat().st_size == 0:
+    if input_seq_path.stat().st_size == 0:
         raise ValueError("the input sequence is empty")
 
-    command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq}"
+    command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq_path}"
     result = check_output(command.split())
     logger.debug(command)
     logger.debug(f"{str(result, 'utf-8')}")
@@ -617,7 +625,7 @@ def train(
     logger.info(f"sequence_size: {sequence_size}")
     if sequence_size < minimum_sequence_size:
         # form of! `probuild --par par_1.default --clean_join sequence --seq test.fa --MIN_CONTIG_SIZE 0 --GAP_FILLER
-        command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq} --MIN_CONTIG_SIZE 0 --GAP_FILLER"
+        command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq_path} --MIN_CONTIG_SIZE 0 --GAP_FILLER"
         result = check_output(command.split())
         logger.debug(command)
         logger.debug(f"{str(result, 'utf-8')}")
