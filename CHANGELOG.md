@@ -1,3 +1,8 @@
+# [0.5.3] - 2021-05-18
+
+## Changed
+- Updated logging so that line numbers are added to message and the message is formatted using `coloredlogs`
+
 # [0.5.2] - 2021-05-12
 
 ## Changed

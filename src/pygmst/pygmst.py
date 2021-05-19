@@ -16,6 +16,7 @@ from pkg_resources import resource_filename
 from sortedcontainers import SortedDict
 
 from pygmst import __version__
+from pygmst.logging import setup_logging
 
 app = typer.Typer(name="pygmst", help="Python translation of GMST")
 
@@ -63,29 +64,6 @@ def version_callback(value: bool):
     if value:
         print(f"pygmst version: {__version__}")
         raise typer.Exit()
-
-
-def setup_logging(name: Optional[str] = None):
-    if name:
-        logger = logging.getLogger(name)
-    else:
-        logger = logging.getLogger(__name__)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    logger.setLevel(logging.DEBUG)
-    logger.propagate = False
-
-    if name:
-        fh = logging.FileHandler(filename=name)
-    else:
-        fh = logging.FileHandler(filename=f"{__name__}.log")
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
-    st = logging.StreamHandler()
-    st.setLevel(logging.INFO)
-    st.setFormatter(formatter)
-    logger.addHandler(st)
 
 
 @app.command(name="")
@@ -195,29 +173,31 @@ def main(
         FASTA containing sequences to use for prediction
 
     """
-    setup_logging("pygmst")
-
-    if verbose == 1:
-        logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.WARN)
+    setup_logging("pygmst.log")
+    logger = logging.getLogger(__name__)
+    if verbose == 0:
+        logger.setLevel(logging.CRITICAL)
+    elif verbose == 1:
+        logger.setLevel(logging.ERROR)
     elif verbose == 2:
-        logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.INFO)
+        logger.setLevel(logging.WARNING)
     elif verbose == 3:
-        logging.basicConfig(filename="pygmst.log", filemode="w", level=logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
     motifopt = bool(int(motifopt.value))
     gcode = int(gcode.value)
     gibbs = int(gibbs.value)
 
-    seqfile = Path(seqfile)
+    seqfile_path = Path(seqfile)
     if output is None:
         if outputformat == "LST":
-            output = seqfile.with_suffix(".lst")
+            output = seqfile_path.with_suffix(".lst")
         elif outputformat == "GFF":
-            output = seqfile.with_suffix(".gff")
+            output = seqfile_path.with_suffix(".gff")
     if fnn:
-        fnn_out = seqfile.with_suffix(".fnn")
+        fnn_out = seqfile_path.with_suffix(".fnn")
     if faa:
-        faa_out = seqfile.with_suffix(".faa")
+        faa_out = seqfile_path.with_suffix(".faa")
     if prok:
         bins = 1
         filterseq = 0
@@ -232,7 +212,7 @@ def main(
         par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
 
     gmst(
-        seqfile=seqfile,
+        seqfile=seqfile_path,
         output=output,
         outputformat=outputformat,
         fnn=fnn,
@@ -244,7 +224,7 @@ def main(
         order=order,
         order_non=order_non,
         gcode=gcode,
-        motifopt=motifopt,
+        motif=motifopt,
         width=width,
         prestart=prestart,
         fixmotif=fixmotif,
@@ -286,12 +266,21 @@ def gmst(
     faa_out: Optional[str] = None,
 ) -> None:
 
+    logger = logging.getLogger(__name__)
     seqfile = Path(seqfile)
+
+    # we need this because sqanti3_qc calls gmst() directly
+    # while the default value for par is set in main()
+    if par is None:
+        par = resource_filename("pygmst", f"genemark/par_{gcode}.default")
 
     if fnn_out is None:
         fnn_out = seqfile.with_suffix(".fnn")
     if faa_out is None:
         faa_out = seqfile.with_suffix(".faa")
+
+    if output is None:
+        output = ""
 
     # with tempfile.TemporaryDirectory() as tmpdir:
     # tmpdir = tempfile.mkdtemp()
@@ -339,6 +328,8 @@ def gmst(
     sinnombre = copyfile(src=seqfile, dst=NamedTemporaryFile().name)
     probuild_cmd = f"{build} {par} --clean_join {seq} --seq {sinnombre}"
 
+    logger.debug(f"copied sequence file at {sinnombre}")
+    logger.debug(f"probuild command: {probuild_cmd}")
     check_output(probuild_cmd.split())
 
     with open(seqfile, "r") as _:
@@ -427,7 +418,7 @@ def gmst(
             # make a GC file for the input file
             # read input sequences
             try:
-                FA = pyfaidx.Fasta(seqfile, duplicate_action="longest")
+                FA = pyfaidx.Fasta(str(seqfile), duplicate_action="longest")
                 seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
                 for read in FA:
                     if read.long_name not in seq_GC_entries:
@@ -446,7 +437,7 @@ def gmst(
             #         logging.info(f"Created {tmpdir}/seq_bin_{i}")
 
             # read input sequences
-            FA = pyfaidx.Fasta(seqfile, duplicate_action="longest")
+            FA = pyfaidx.Fasta(str(seqfile), duplicate_action="longest")
             seq_GC_entries = [_.lstrip(">") for _ in seq_GC.keys()]
             seq_bins: Dict[int, List[str]] = {
                 k: [] for k in (_ for _ in range(0, bin_num))
@@ -513,23 +504,23 @@ def gmst(
                     bin_num=i,
                     # tmpdir=tmpdir,
                 )
-                logging.info(f"train() returned: {current_model}")
+                logger.info(f"train() returned: {current_model}")
                 if current_model:
                     models.extend([current_model])
 
-            logging.debug(
+            logger.debug(
                 f"combine {len(models)} individual models to make the final model file"
             )
             model_names = "\n".join(models)
-            logging.debug(f"those models are: {model_names}")
+            logger.debug(f"those models are: {model_names}")
             final_model = combineModels(
                 mod=models,
                 cut_offs=cutoffs,
             )  # tmpdir=tmpdir)
-            logging.info(f"combineModels() returned: {final_model}")
+            logger.info(f"combineModels() returned: {final_model}")
 
         check_output(f"cp {final_model} {out_name}".split())
-        logging.info(f"Ran 'cp {final_model} {out_name}' but not sure why?")
+        logger.info(f"Ran 'cp {final_model} {out_name}' but not sure why?")
 
     if outputformat == "GFF":
         format_gmhmmp = " -f G "
@@ -549,21 +540,21 @@ def gmst(
         if motif:
             command = f"{hmm} -r -m {out_name} -o {output} {format_gmhmmp} {seqfile}"
             result = check_output(command.split())
-            logging.debug(command)
-            logging.debug(f"{str(result, 'utf-8')}")
+            logger.debug(command)
+            logger.debug(f"{str(result, 'utf-8')}")
         else:
             # no moitf option specified
             command = f"{hmm} -m {out_name} -o {output} {format_gmhmmp} {seqfile}"
             result = check_output(command.split())
-            logging.debug(command)
-            logging.debug(f"{str(result, 'utf-8')}")
+            logger.debug(command)
+            logger.debug(f"{str(result, 'utf-8')}")
     else:
         meta_model = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
         # no iterations - use heuristic only
         command = f"{hmm} -m {meta_model} -o {output} {format_gmhmmp} {seqfile}"
         result = check_output(command.split())
-        logging.debug(command)
-        logging.debug(f"{str(result, 'utf-8')}")
+        logger.debug(command)
+        logger.debug(f"{str(result, 'utf-8')}")
 
     print(f"wrote final results to {output}")
 
@@ -588,7 +579,8 @@ def train(
     bin_num: int = 0,
     # tmpdir: Optional[str] = None,
 ) -> str:
-    logging.info("Beginning training")
+    logger = logging.getLogger(__name__)
+    logger.info("Beginning training")
     # ------------------------------------------------
     # prepare sequence
     # build_cmd should have the form of! `probuild --par par_1.default`
@@ -601,8 +593,8 @@ def train(
 
     command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq}"
     result = check_output(command.split())
-    logging.debug(command)
-    logging.debug(f"{str(result, 'utf-8')}")
+    logger.debug(command)
+    logger.debug(f"{str(result, 'utf-8')}")
 
     # tmp solution: get sequence size, get minimum sequence size from --par <file>
     # compare, skip iterations if short
@@ -621,21 +613,21 @@ def train(
     do_iterations = True
     itr = 0
 
-    logging.info(f"minimum_sequence_size: {minimum_sequence_size}")
-    logging.info(f"sequence_size: {sequence_size}")
+    logger.info(f"minimum_sequence_size: {minimum_sequence_size}")
+    logger.info(f"sequence_size: {sequence_size}")
     if sequence_size < minimum_sequence_size:
         # form of! `probuild --par par_1.default --clean_join sequence --seq test.fa --MIN_CONTIG_SIZE 0 --GAP_FILLER
         command = f"{build_cmd} {par} --clean_join {seq} --seq {input_seq} --MIN_CONTIG_SIZE 0 --GAP_FILLER"
         result = check_output(command.split())
-        logging.debug(command)
-        logging.debug(f"{str(result, 'utf-8')}")
+        logger.debug(command)
+        logger.debug(f"{str(result, 'utf-8')}")
 
         init_mod = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
         next_item = f"bin_{bin_num}{hmmout_suffix}"
         command = f"{hmm_cmd} -m {init_mod} -o {next_item} {seq}"
         result = check_output(command.split())
-        logging.debug(command)
-        logging.debug(f"{str(result, 'utf-8')}")
+        logger.debug(command)
+        logger.debug(f"{str(result, 'utf-8')}")
 
         mod = f"bin_{bin_num}{mod_suffix}"
         # $command = "$build            --mkmod $mod  --seq $seq  --geneset $next       --ORDM $order  --order_non $order_non  --revcomp_non 1";
@@ -652,10 +644,10 @@ def train(
 
         try:
             results = check_output(command.split())
-            logging.debug(command)
-            logging.debug(f"{str(result, 'utf-8')}")
+            logger.debug(command)
+            logger.debug(f"{str(result, 'utf-8')}")
         except CalledProcessError as e:
-            logging.debug(e)
+            logger.debug(e)
         return mod  # this may end up returning an empty file because the bin{bin_num}.lst file is empty or has insufficient number of entries.
         # this, in turn, fouls up the
 
@@ -670,16 +662,16 @@ def train(
     mod = resource_filename("pygmst", "genemark/MetaGeneMark_v1.mod")
     command = f"{hmm_cmd} -m {mod} -o {next_item} {seq}"
     result = check_output(command.split())
-    logging.debug(command)
-    logging.debug(f"{str(result, 'utf-8')}")
+    logger.debug(command)
+    logger.debug(f"{str(result, 'utf-8')}")
 
     # enter iterations loop
     if do_iterations:
-        logging.info("entering training iteration loop")
+        logger.info("entering training iteration loop")
     while do_iterations:
         itr += 1
         mod = f"{mod_prefix}{itr}_bin_{bin_num}{mod_suffix}"
-        logging.info(f"iteration: {itr}, mod: {mod}")
+        logger.info(f"iteration: {itr}, mod: {mod}")
 
         if motif and not fixmotif:
             start_seq = f"{start_prefix}{itr}"
@@ -695,10 +687,10 @@ def train(
             )
             # command += f" --fixmotif --PRE_START_WIDTH {prestart} --width {width} --log {logfile}"
 
-        logging.info(f"build model: {mod} for iteration: {itr}")
+        logger.info(f"build model: {mod} for iteration: {itr}")
         results = check_output(command.split())
-        logging.debug(command)
-        logging.debug(f"{str(result, 'utf-8')}")
+        logger.debug(command)
+        logger.debug(f"{str(result, 'utf-8')}")
 
         if (
             motif and not fixmotif
@@ -707,22 +699,22 @@ def train(
             #     &RunSystem( "$gibbs $start_seq $width -n > $gibbs_out", "run gibbs sampler\n" )
             # elif $gibbs_version == 3:
             #     &RunSystem( "$gibbs3 $start_seq $width -o $gibbs_out -F -Z  -n -r -y -x -m -s 1 -w 0.01", "run gibbs3 sampler\n" )
-            logging.info("run gibbs3 sampler")
+            logger.info("run gibbs3 sampler")
             # form of! 'Gibbs3 startseq.{itr} 12 -o gibbs_out.{itr} -F -Z -n -r -y -x -m -s 1 -w 0.01"
             command = f"{gibbs3} {start_seq} {width} -o {gibbs_out} -F -Z -n -r -y -x -m -s 1 -w 0.01"
             result = check_output(command.split())
-            logging.debug(command)
-            logging.debug(f"{str(result, 'utf-8')}")
+            logger.debug(command)
+            logger.debug(f"{str(result, 'utf-8')}")
 
-            logging.info("make prestart model")
+            logger.info("make prestart model")
             # run([build_cmd, "--gibbs", gibbs_out, "--mod", mod, "--seq", start_seq, "--log", logfile])
             # form of! `probuild --par par_1.default --gibs gibbs_out.{itr} --mod itr_{itr}.mod --seq startseq.{itr}
             command = (
                 f"{build_cmd} {par} --gibbs {gibbs_out} --mod {mod} --seq {start_seq}"
             )
             result = check_output(command.split())
-            logging.debug(command)
-            logging.debug(f"{str(result, 'utf-8')}")
+            logger.debug(command)
+            logger.debug(f"{str(result, 'utf-8')}")
 
         prev = next_item
         # next_item = itr_{itr}.lst
@@ -735,37 +727,38 @@ def train(
         if motif:
             command += " -r"
 
-        logging.info(f"prediction, iteration: {itr}")
+        logger.info(f"prediction, iteration: {itr}")
         result = check_output(command.split())
-        logging.debug(command)
-        logging.debug(f"{str(result, 'utf-8')}")
+        logger.debug(command)
+        logger.debug(f"{str(result, 'utf-8')}")
 
         # `probuild --par par_1.default --compare --source itr_{itr}.lst --target itr_{itr-1}.lst
         command = f"{build_cmd} {par} --compare --source {next_item} --target {prev}"
         # &Log( "compare:\n" . $command . "\n" );
 
         results = check_output(command.split())
-        logging.debug(command)
-        logging.debug(f"{str(result, 'utf-8')}")
+        logger.debug(command)
+        logger.debug(f"{str(result, 'utf-8')}")
 
         diff = str(results, "utf-8").strip("\n")
-        logging.info(f"iteration {itr}, bin {bin_num} difference: {diff}")
+        logger.info(f"iteration {itr}, bin {bin_num} difference: {diff}")
         # &Log( "compare $prev and $next_item: $diff\n" );
 
         if float(diff) >= identity:
-            logging.info(f"Stopped iterations on identity: {diff}")
+            logger.info(f"Stopped iterations on identity: {diff}")
             do_iterations = False
         if itr == maxitr:
-            logging.info(f"Stopped iterations on maximum number: {maxitr}")
+            logger.info(f"Stopped iterations on maximum number: {maxitr}")
             return mod
-    logging.info(f"return value of train: {mod}")
+    logger.info(f"return value of train: {mod}")
     return mod
 
 
 def cluster(
     feature_f: str, clusters: int, min_length: int = 10000
 ) -> Tuple[int, List[int], Dict[str, int]]:  # $gc_out, $bins
-    logging.debug("Beginning clustering")
+    logger = logging.getLogger(__name__)
+    logger.debug("Beginning clustering")
     gc_hash: Dict[int, int] = dict()
     cut_off_points: List[int] = list()
     num_of_seq = 0
@@ -780,13 +773,13 @@ def cluster(
             # if (text := re.search(pattern="^>(.*?)\t(\d+)\s+(\d+)", string=line)): # switch to this?  only support python>=3.8?
             text = re.search(pattern=r"^>(.*?)\t(\d+)\s+(\d+)", string=line)
             if text:
-                # logging.debug(f"text.group(0) = {text.group(0)}")
+                # logger.debug(f"text.group(0) = {text.group(0)}")
                 header = text.group(1)  # Reference name
-                # logging.debug(f"header = {header}")
+                # logger.debug(f"header = {header}")
                 length = int(text.group(2))  # length of sequence?
-                # logging.debug(f"header = {length}")
+                # logger.debug(f"header = {length}")
                 seqGC = int(text.group(3))  # must be GC percentage
-                # logging.debug(f"header = {seqGC}")
+                # logger.debug(f"header = {seqGC}")
 
                 header_to_cod_GC[header] = seqGC
                 num_of_seq += 1
@@ -807,13 +800,13 @@ def cluster(
 
         if previous < total_length / 3 and gc_hash[key] >= total_length / 3:
             one_third = key
-            logging.debug(f"({one_third})->({gc_hash[one_third]})\n")
+            logger.debug(f"({one_third})->({gc_hash[one_third]})\n")
         if previous < total_length / 3 * 2 and gc_hash[key] >= total_length / 3 * 2:
             two_third = key
-            logging.debug(f"({two_third})->({gc_hash[two_third]})\n")
+            logger.debug(f"({two_third})->({gc_hash[two_third]})\n")
         if previous < total_length / 2 and gc_hash[key] >= total_length / 2:
             one_half = key
-            logging.debug(f"({one_half})->({gc_hash[one_half]})\n")
+            logger.debug(f"({one_half})->({gc_hash[one_half]})\n")
         previous = gc_hash[key]
 
     if clusters == 0:
@@ -861,9 +854,10 @@ def combineModels(
     concatenate model files into one in MGM format:
     starts with "__GC" and ends with "end"
     """
-    logging.debug("combining models")
+    logger = logging.getLogger(__name__)
+    logger.debug("combining models")
     model_names = "\n".join(mod)
-    logging.debug(f"models for combining: {model_names}")
+    logger.debug(f"models for combining: {model_names}")
 
     # change the min and max GC value of cut_offs to the minGC and maxGC used by gmhmmp
     cut_offs[0] = minGC
@@ -876,7 +870,7 @@ def combineModels(
         for i in range(minGC, maxGC + 1):
             model.write(f"__GC{i}\t\n")
             if i == cut_offs[b] or i == maxGC:
-                logging.debug(f"combineModels processing {mod[b-1]}")
+                logger.debug(f"combineModels processing {mod[b-1]}")
                 if Path(mod[b - 1]).exists():
                     with open(file=mod[b - 1], mode="r") as fh:
                         for line in fh:
@@ -887,7 +881,7 @@ def combineModels(
                     model.write(data)
                     model.write("end \t\n\n")
                 else:
-                    logging.debug(f"combineModels could not find {mod[b-1]}")
+                    logger.debug(f"combineModels could not find {mod[b-1]}")
                 if b > len(mod):
                     break
                 b += 1
