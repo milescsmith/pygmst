@@ -1,3 +1,8 @@
+# [0.5.6] - 2021-05-20
+
+## Fixed
+- forgot about `isinstance`.  That acutally works where `type(x) == "y"` does not
+
 # [0.5.5] - 2021-05-20
 
 ## Changed

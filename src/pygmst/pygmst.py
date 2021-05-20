@@ -267,7 +267,7 @@ def gmst(
 ) -> None:
 
     logger = logging.getLogger(__name__)
-    if type(seqfile) == "str":
+    if not isinstance(seqfile, Path):
         seqfile_path = Path(seqfile)
     else:
         seqfile_path = seqfile
@@ -585,10 +585,11 @@ def train(
     logger = logging.getLogger(__name__)
     logger.info("Beginning training")
 
-    if type(input_seq) == "str":
+    if not isinstance(input_seq, Path):
         input_seq_path = Path(input_seq)
     else:
         input_seq_path = input_seq
+    
     # ------------------------------------------------
     # prepare sequence
     # build_cmd should have the form of! `probuild --par par_1.default`
