@@ -1,3 +1,9 @@
+# [0.5.5] - 2021-05-20
+
+## Changed
+- Updated dependencies, removed `click` and `click-option-group` from dependencies.
+
+
 # [0.5.4] - 2021-05-18
 
 ## Changed
